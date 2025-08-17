@@ -4,14 +4,6 @@ import (
 	"regexp"
 )
 
-type GetMessagesRequest struct {
-	ConversationID string `json:"conversation_id"`
-}
-
-func (m *GetMessagesRequest) IsValid() bool {
-	return len(m.ConversationID) >= 1 && len(m.ConversationID) <= 36
-}
-
 type SendMessageRequest struct {
 	ConversationID string         `json:"conversation_id"`
 	Content        MessageContent `json:"content"`
@@ -50,4 +42,16 @@ func (f *ForwardMessageRequest) IsValid() bool {
 	return len(f.ConversationID) >= 1 && len(f.ConversationID) <= 36 &&
 		len(f.MessageID) >= 1 && len(f.MessageID) <= 36 &&
 		len(f.TargetConversationID) >= 1 && len(f.TargetConversationID) <= 36
+}
+
+type DeleteMessageRequest struct {
+	ConversationID string `json:"conversation_id"`
+	MessageID      string `json:"message_id"`
+	UserID         string `json:"user_id"`
+}
+
+func (d *DeleteMessageRequest) IsValid() bool {
+	return len(d.ConversationID) >= 1 && len(d.ConversationID) <= 36 &&
+		len(d.MessageID) >= 1 && len(d.MessageID) <= 36 &&
+		len(d.UserID) >= 3 && len(d.UserID) <= 16
 }

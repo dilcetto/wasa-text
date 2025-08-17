@@ -1,18 +1,34 @@
 package schema
 
-import (
-	"time"
-)
-
-type Message struct {
-	Content       MessageContent `json:"content"`            // The content of the message.
-	Timestamp     time.Time      `json:"timestamp"`          // The time when the message was sent.
-	Sender        string         `json:"sender"`             // The sender of the message.
-	MessageStatus string         `json:"message_status"`     // The status of the message (e.g., sent, delivered, read).
-	Reaction      []Reaction     `json:"reaction,omitempty"` // Optional reactions to the message.
+type Sender struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
 }
 
+type Message struct {
+	ID            string         `json:"id"`
+	Sender        Sender         `json:"sender"`
+	Content       MessageContent `json:"content"`
+	Timestamp     string         `json:"timestamp"`
+	MessageStatus string         `json:"message_status"` // "sent", "delivered", "read"
+	Reaction      []Reaction     `json:"reaction,omitempty"`
+	Attachments   []string       `json:"attachments,omitempty"`
+	ForwardedFrom string         `json:"forwarded_from,omitempty"`
+}
+
+type ContentType string
+
+const (
+	TextContent ContentType = "text"
+	Image       ContentType = "image"
+)
+
 type MessageContent struct {
-	Type  string `json:"type"`  // "text" or "photo"
-	Value string `json:"value"` // Text content or image URL
+	ContentType ContentType `json:"type"`  // Type of content (text, image, video, etc.)
+	Value       string      `json:"value"` // Text content or image
+}
+
+type Reaction struct {
+	Emoji    string `json:"emoji"`    // The emoji used for the reaction.
+	Username string `json:"username"` // The username of the user who reacted.
 }

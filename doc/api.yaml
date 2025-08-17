@@ -46,11 +46,10 @@ paths:
             application/json:
               schema:
                 type: object
-                description: Object that contains user ID and auth token.
+                description: User and auth token.
                 properties:
-                  id:
-                    type: string
-                    description: Unique identifier for the user.
+                  user:
+                    $ref: '#/components/schemas/User'
                   token:
                     type: string
                     description: Bearer token (JWT) for authentication.
@@ -91,7 +90,7 @@ paths:
                   users:
                     type: array
                     items:
-                      $ref: '#/components/schemas/Username'
+                      $ref: '#/components/schemas/User'
                     description: List of usernames matching the search query.
                   conversations:
                     type: array
@@ -127,15 +126,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                description: Object that contains message.
-                properties:
-                  message:
-                    type: string
-                    description: Confirmation message
-                  newUsername:
-                    type: string
-                    description: The updated username.
+                $ref: '#/components/schemas/User'
         '400':
           description: Username taken or invalid
           content:
@@ -150,7 +141,8 @@ paths:
       summary: Update user profile photo
       description: Allows a user to set or update their profile photo.
       operationId: setMyPhoto
-      security: []
+      security: 
+        - BearerAuth: []
       requestBody:
         description: Payload containing the new photo
         required: true
@@ -401,6 +393,8 @@ paths:
       summary: Remove a reaction from a specific message
       description: Removes a reaction or comment from a specified message within a conversation.
       operationId: uncommentMessage
+      security:
+        - BearerAuth: []
       responses:
         '204':
           description: Reaction removed successfully
@@ -620,6 +614,25 @@ components:
           Use a valid JWT token in the Authorization header to access protected endpoints.
 
   schemas:
+    User: 
+      type: object
+      description: Represents a user in the WASAText system.
+      required:
+        - id
+        - username
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the user.
+          pattern: ^.*?$
+          minLength: 1
+          maxLength: 36
+        username:
+          $ref: '#/components/schemas/Username'
+        photoUrl:
+          type: string
+          format: uri
+          description: URL to the user's profile photo
     Username:
       type: string
       pattern: ^[a-zA-Z0-9_]+$
@@ -649,6 +662,10 @@ components:
           type: string
           enum: [private, group]
           description: Indicates whether the conversation is a private chat or a group conversation.
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp of when the conversation was created.
         members:
           type: array
           description: List of usernames in the conversation.
@@ -678,6 +695,8 @@ components:
         - content
         - timestamp
         - message_status
+        - reaction
+        - attachment
       properties:
         id:
           type: string
@@ -732,6 +751,12 @@ components:
           items:
             type: string
             format: uri
+        forwarded_from:
+          type: string
+          description: ID of the user this message was forwarded from.
+          pattern: ^.*?$
+          minLength: 1
+          maxLength: 36
     Reaction:
       type: object
       description: A reaction to a message.

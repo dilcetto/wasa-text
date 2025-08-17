@@ -15,7 +15,7 @@ func (u *UsernameUpdateRequest) IsValid() bool {
 }
 
 type ProfilePhotoUpdateRequest struct {
-	PhotoURL string `json:"photo_url"`
+	PhotoURL string `json:"photoUrl"`
 }
 
 func (u *ProfilePhotoUpdateRequest) IsValid() bool {

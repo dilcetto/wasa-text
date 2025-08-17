@@ -1,0 +1,189 @@
+package database
+
+import (
+	"database/sql"
+	"fmt"
+
+	"github.com/dilcetto/wasa/service/components/schema"
+)
+
+func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, error) {
+	query := `
+		SELECT c.id, c.name, c.type, c.created_at, c.conversationPhoto
+		FROM conversations c
+		JOIN conversation_members cm ON cm.conversation_id = c.id
+		WHERE cm.user_id = ?`
+
+	rows, err := db.c.Query(query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query conversations: %w", err)
+	}
+	defer rows.Close()
+
+	var conversations []*schema.Conversation
+
+	for rows.Next() {
+		var conv schema.Conversation
+		var convPhoto sql.NullString
+		if err := rows.Scan(&conv.ConversationID, &conv.DisplayName, &conv.Type, &conv.CreatedAt, &convPhoto); err != nil {
+			return nil, err
+		}
+
+		// Set the profile photo if it exists
+		if conv.Type == "private" {
+			// Get the other user's info
+			err = db.c.QueryRow(`
+				SELECT u.username, u.photoURL
+				FROM users u
+				JOIN conversation_members cm ON cm.userId = u.id
+				WHERE cm.conversationId = ? AND cm.userId != ?
+			`, conv.ConversationID, userID).Scan(&conv.DisplayName, &conv.ProfilePhoto)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get private conversation info: %w", err)
+			}
+		} else {
+			// For group conversations, set the profile photo to the group photo
+			conv.ProfilePhoto = convPhoto.String
+		}
+		// Fetch members
+		memberRows, err := db.c.Query(`SELECT userId FROM conversation_members WHERE conversationId = ?`, conv.ConversationID)
+		if err != nil {
+			return nil, err
+		}
+		for memberRows.Next() {
+			var memberID string
+			if err := memberRows.Scan(&memberID); err != nil {
+				return nil, err
+			}
+			conv.Members = append(conv.Members, memberID)
+		}
+		memberRows.Close()
+		// Fetch last message
+		var last schema.LastMessage
+		var senderID string
+		err = db.c.QueryRow(`
+			SELECT content, timestamp, senderId
+			FROM messages
+			WHERE conversationId = ?
+			ORDER BY timestamp DESC LIMIT 1
+		`, conv.ConversationID).Scan(&last.Preview, &last.Timestamp, &senderID)
+		if err == nil {
+			last.MessageType = "text" // adjust for later message types
+			conv.LastMessage = &last
+		}
+
+		conversations = append(conversations, &conv)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return conversations, nil
+}
+
+func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema.Conversation, error) {
+	query := `
+		SELECT c.id, c.name, c.type, c.created_at, c.conversationPhoto
+		FROM conversations c
+		JOIN conversation_memebers cm ON cm.conversation_id = c.id
+		WHERE cm.id = ? AND cm.user_id = ?`
+
+	var conv schema.Conversation
+	var convPhoto sql.NullString
+
+	err := db.c.QueryRow(query, conversationID, userID).Scan(&conv.ConversationID, &conv.DisplayName, &conv.Type, &conv.CreatedAt, &convPhoto)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("conversation not found")
+		}
+		return nil, fmt.Errorf("failed to get conversation: %w", err)
+	}
+
+	if conv.Type == "private" {
+		// Get the other user's info
+		err = db.c.QueryRow(`
+			SELECT u.username, u.photoURL
+			FROM users u
+			JOIN conversation_members cm ON cm.userId = u.id
+			WHERE cm.conversationId = ? AND cm.userId != ?
+		`, conv.ConversationID, userID).Scan(&conv.DisplayName, &conv.ProfilePhoto)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get private conversation info: %w", err)
+		}
+	} else {
+		// For group conversations, set the profile photo to the group photo
+		conv.ProfilePhoto = convPhoto.String
+	}
+
+	// Fetch members
+	memberRows, err := db.c.Query(`SELECT userId FROM conversation_members WHERE conversationId = ?`, conv.ConversationID)
+	if err != nil {
+		return nil, err
+	}
+	for memberRows.Next() {
+		var memberID string
+		if err := memberRows.Scan(&memberID); err != nil {
+			return nil, err
+		}
+		conv.Members = append(conv.Members, memberID)
+	}
+	memberRows.Close()
+
+	// Fetch last message
+	var last schema.LastMessage
+	var senderID string
+	err = db.c.QueryRow(`
+		SELECT content, timestamp, senderId
+		FROM messages
+		WHERE conversationId = ?
+		ORDER BY timestamp DESC LIMIT 1
+	`, conv.ConversationID).Scan(&last.Preview, &last.Timestamp, &senderID)
+	if err == nil {
+		last.MessageType = "text" // adjust for later message types
+		conv.LastMessage = &last
+	}
+
+	return &conv, nil
+}
+
+// CreateConversation inserts a new conversation into the database.
+// This method is kept explicitly to be reused by other internal logic
+// (e.g., auto-creating private conversations during SendMessage) or
+// for explicit group chat creation if needed in the future.
+func (db *appdbimpl) CreateConversation(conversation *schema.Conversation) error {
+	query := `
+		INSERT INTO conversations (id, name, type, created_at, conversationPhoto)
+		VALUES (?, ?, ?, datetime('now'), ?)`
+
+	_, err := db.c.Exec(query, conversation.ConversationID, conversation.DisplayName, conversation.Type, conversation.ProfilePhoto)
+	if err != nil {
+		return fmt.Errorf("failed to create conversation: %w", err)
+	}
+
+	for _, memberID := range conversation.Members {
+		_, err = db.c.Exec(`INSERT INTO conversation_members (conversationId, userId) VALUES (?, ?)`, conversation.ConversationID, memberID)
+		if err != nil {
+			return fmt.Errorf("failed to add member to conversation: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (db *appdbimpl) GetLastMessageByConversationID(conversationID string) (*schema.Message, error) {
+	query := `
+		SELECT id, content, timestamp, senderId, conversationId, messageType, attachment
+		FROM messages
+		WHERE conversationId = ?
+		ORDER BY timestamp DESC LIMIT 1`
+
+	var msg schema.Message
+	err := db.c.QueryRow(query, conversationID).Scan(&msg.ID, &msg.Content, &msg.Timestamp, &msg.SenderID, &msg.ConversationID, &msg.MessageType)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("no messages found for conversation %s", conversationID)
+		}
+		return nil, fmt.Errorf("failed to get last message: %w", err)
+	}
+
+	return &msg, nil
+}
