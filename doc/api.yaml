@@ -72,10 +72,18 @@ paths:
       parameters:
         - name: user
           in: query
-          required: true 
+          required: false 
           schema:
             type: string
             description: Search query for users.
+            minLength: 1
+            maxLength: 100
+        - name: conversation
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Search query for conversations.
             minLength: 1
             maxLength: 100
       responses:
@@ -359,7 +367,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  
+
+  /conversations/{conversationId}/messages/{messageId}/status:
+    post:
+      tags:
+        - Message
+      summary: Update message delivery or read status
+      description: |
+        Updates the delivery or read status of a message for a specific user.
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the conversation containing the message.
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the message whose status is being updated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - status
+              properties:
+                userId:
+                  type: string
+                  description: The ID of the user marking the message.
+                status:
+                  type: string
+                  enum: [delivered, read]
+                  description: The status to update (must be either `delivered` or `read`).
+      responses:
+        '200':
+          description: Status updated successfully
+        '400':
+          description: Invalid input (e.g., missing userId or invalid status)
+        '404':
+          description: Message or user not found
 
   /conversations/{conversationId}/messages/{messageId}/comment:
     post:
@@ -797,7 +849,7 @@ components:
           type: array
           description: List of users in the group
           items:
-            $ref: '#/components/schemas/Username'
+            $ref: '#/components/schemas/User'
           minItems: 3
           maxItems: 100
     Error:
@@ -807,4 +859,5 @@ components:
         error:
           type: string
           description: Error details about why the request failed 
+
 

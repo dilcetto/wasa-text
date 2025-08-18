@@ -34,14 +34,45 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+
+	"github.com/dilcetto/wasa/service/components/schema"
 )
 
 // AppDatabase is the high level interface for the DB
 type AppDatabase interface {
-	GetName() (string, error)
-	SetName(name string) error
-
 	Ping() error
+
+	//user related
+	GetUserByName(username string) (*schema.User, error)
+	CreateUser(user *schema.User) error
+	UpdateUsername(userID, newUsername string) error
+	UpdateUserPhoto(userID, photoURL string) error
+
+	//conversation related
+	GetMyConversations(userID string) ([]*schema.Conversation, error)
+	GetConversationByID(userID, conversationID string) (*schema.Conversation, error)
+	CreateConversation(conversation *schema.Conversation) error
+	GetLastMessageByConversationID(conversationID string) (*schema.Message, error)
+
+	//message related
+	SendMessage(message *schema.Message) error
+	GetMessagesByConversationID(conversationID string) ([]*schema.Message, error)
+	ForwardMessage(message *schema.Message, userID string) error
+	DeleteMessage(conversationID, messageID, userID string) error
+	MarkMessageStatus(messageID, userID, status string) error
+
+	//group related
+	GetGroupByID(groupID string) (*schema.Group, error)
+	GetMyGroups(userID string) ([]*schema.Group, error)
+	CreateGroup(group *schema.Group) error
+	UpdateGroupName(groupID, newName string) error
+	UpdateGroupPhoto(groupID, photoURL string) error
+	AddUserToGroup(groupID, userID string) error
+	LeaveGroup(groupID, userID string) error
+
+	//reaction related
+	AddReactionToMessage(messageID, userID, reaction string) error
+	DeleteReactionFromMessage(messageID, userID string) error
 }
 
 type appdbimpl struct {
@@ -54,21 +85,114 @@ func New(db *sql.DB) (AppDatabase, error) {
 	if db == nil {
 		return nil, errors.New("database is required when building a AppDatabase")
 	}
+	_, err := db.Exec("PRAGMA foreign_keys = ON;")
+	if err != nil {
+		return nil, err
+	}
 
 	// Check if table exists. If not, the database is empty, and we need to create the structure
 	var tableName string
-	err := db.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name='example_table';`).Scan(&tableName)
+	err = db.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name='users';`).Scan(&tableName)
 	if errors.Is(err, sql.ErrNoRows) {
-		sqlStmt := `CREATE TABLE example_table (id INTEGER NOT NULL PRIMARY KEY, name TEXT);`
-		_, err = db.Exec(sqlStmt)
-		if err != nil {
-			return nil, fmt.Errorf("error creating database structure: %w", err)
+		usersTable := `CREATE TABLE users (
+			id TEXT NOT NULL PRIMARY KEY,
+			username TEXT NOT NULL UNIQUE,
+			photoURL TEXT
+		);`
+
+		conversationsTable := `CREATE TABLE conversations (
+			id TEXT NOT NULL PRIMARY KEY,
+			name TEXT NOT NULL,
+			type TEXT NOT NULL CHECK (type IN ('group', 'direct')),
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			conversationPhoto TEXT
+		);`
+
+		conversationMembersTable := `CREATE TABLE conversation_members (
+			conversationId TEXT NOT NULL,
+			userId TEXT NOT NULL,
+			PRIMARY KEY (conversationId, userId),
+			FOREIGN KEY (conversationId) REFERENCES conversations(id) ON DELETE CASCADE,
+			FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+		);`
+
+		messagesTable := `CREATE TABLE messages (
+			id TEXT NOT NULL PRIMARY KEY,
+			conversationId TEXT NOT NULL,
+			senderId TEXT NOT NULL,
+			content TEXT NOT NULL,
+			timestamp TEXT NOT NULL,
+			attachment BLOB,
+			status TEXT NOT NULL,
+			replyTo TEXT,
+			forwardedFrom TEXT,
+			FOREIGN KEY (conversationId) REFERENCES conversations(id) ON DELETE CASCADE,
+			FOREIGN KEY (senderId) REFERENCES users(id) ON DELETE CASCADE
+		);`
+
+		reactionsTable := `CREATE TABLE reactions (
+			messageId TEXT NOT NULL,
+			userId TEXT NOT NULL,
+			reaction TEXT NOT NULL,
+			PRIMARY KEY (messageId, userId),
+			FOREIGN KEY (messageId) REFERENCES messages(id) ON DELETE CASCADE,
+			FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+		);`
+
+		groupsTable := `CREATE TABLE groups (
+			id TEXT NOT NULL PRIMARY KEY,
+			name TEXT NOT NULL,
+			photoURL TEXT
+		);`
+
+		groupMembersTable := `CREATE TABLE group_members (
+			groupId TEXT NOT NULL,
+			userId TEXT NOT NULL,
+			PRIMARY KEY (groupId, userId),
+			FOREIGN KEY (groupId) REFERENCES groups(id) ON DELETE CASCADE,
+			FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+		);`
+
+		messageStatusTable := `CREATE TABLE message_status (
+			messageId TEXT NOT NULL,
+			userId TEXT NOT NULL,
+			deliveredAt TEXT NOT NULL,
+			readAt TEXT,
+			PRIMARY KEY (messageId, userId),
+			FOREIGN KEY (messageId) REFERENCES messages(id) ON DELETE CASCADE,
+			FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+		);`
+
+		messageReceipts := `CREATE TABLE message_receipts (
+			message_id TEXT NOT NULL,
+			user_id TEXT NOT NULL,
+			status TEXT CHECK(status IN ('delivered', 'read')) NOT NULL,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY (message_id, user_id),
+			FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		);`
+
+		creationQueries := []string{
+			usersTable,
+			conversationsTable,
+			conversationMembersTable,
+			messagesTable,
+			reactionsTable,
+			groupsTable,
+			groupMembersTable,
+			messageStatusTable,
+			messageReceipts,
+		}
+		for _, stmt := range creationQueries {
+			_, err = db.Exec(stmt)
+			if err != nil {
+				return nil, fmt.Errorf("error creating table: %w", err)
+			}
 		}
 	}
 
-	return &appdbimpl{
-		c: db,
-	}, nil
+	return &appdbimpl{c: db}, nil
 }
 
 func (db *appdbimpl) Ping() error {
