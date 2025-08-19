@@ -6,14 +6,17 @@ type Sender struct {
 }
 
 type Message struct {
-	ID            string         `json:"id"`
-	Sender        Sender         `json:"sender"`
-	Content       MessageContent `json:"content"`
-	Timestamp     string         `json:"timestamp"`
-	MessageStatus string         `json:"message_status"` // "sent", "delivered", "read"
-	Reaction      []Reaction     `json:"reaction,omitempty"`
-	Attachments   []string       `json:"attachments,omitempty"`
-	ForwardedFrom string         `json:"forwarded_from,omitempty"`
+	ID             string         `json:"id"`
+	Sender         Sender         `json:"sender"`
+	SenderID       string         `json:"senderId"`
+	ConversationID string         `json:"conversationId"`
+	MessageType    string         `json:"messageType"`
+	Content        MessageContent `json:"content"`
+	Timestamp      string         `json:"timestamp"`
+	MessageStatus  string         `json:"message_status"`
+	Reaction       []Reaction     `json:"reaction,omitempty"`
+	Attachments    []string       `json:"attachments,omitempty"`
+	ForwardedFrom  string         `json:"forwarded_from,omitempty"`
 }
 
 type ContentType string
@@ -24,11 +27,13 @@ const (
 )
 
 type MessageContent struct {
-	ContentType ContentType `json:"type"`  // Type of content (text, image, video, etc.)
-	Value       string      `json:"value"` // Text content or image
+	ContentType ContentType `json:"type"`
+	Value       string      `json:"value"`
 }
 
 type Reaction struct {
-	Emoji    string `json:"emoji"`    // The emoji used for the reaction.
-	Username string `json:"username"` // The username of the user who reacted.
+	MessageId string `json:"message_id"` // ID of the message this reaction belongs to.
+	UserId    string `json:"user_id"`    // ID of the user who reacted.
+	Emoji     string `json:"emoji"`      // The emoji used for the reaction.
+	Username  string `json:"username"`   // The username of the user who reacted.
 }

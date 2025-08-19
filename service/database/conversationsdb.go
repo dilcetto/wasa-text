@@ -84,7 +84,7 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 	query := `
 		SELECT c.id, c.name, c.type, c.created_at, c.conversationPhoto
 		FROM conversations c
-		JOIN conversation_memebers cm ON cm.conversation_id = c.id
+		JOIN conversation_members cm ON cm.conversation_id = c.id
 		WHERE cm.id = ? AND cm.user_id = ?`
 
 	var conv schema.Conversation
@@ -171,13 +171,13 @@ func (db *appdbimpl) CreateConversation(conversation *schema.Conversation) error
 
 func (db *appdbimpl) GetLastMessageByConversationID(conversationID string) (*schema.Message, error) {
 	query := `
-		SELECT id, content, timestamp, senderId, conversationId, messageType, attachment
+		SELECT id, content, timestamp, sender, attachment
 		FROM messages
 		WHERE conversationId = ?
 		ORDER BY timestamp DESC LIMIT 1`
 
 	var msg schema.Message
-	err := db.c.QueryRow(query, conversationID).Scan(&msg.ID, &msg.Content, &msg.Timestamp, &msg.SenderID, &msg.ConversationID, &msg.MessageType)
+	err := db.c.QueryRow(query, conversationID).Scan(&msg.ID, &msg.Content, &msg.Timestamp, &msg.Sender, &msg.Attachments)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("no messages found for conversation %s", conversationID)

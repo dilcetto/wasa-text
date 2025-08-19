@@ -71,8 +71,8 @@ type AppDatabase interface {
 	LeaveGroup(groupID, userID string) error
 
 	//reaction related
-	AddReactionToMessage(messageID, userID, reaction string) error
-	DeleteReactionFromMessage(messageID, userID string) error
+	AddReactionToMessage(reaction *schema.Reaction) error
+	DeleteReactionFromMessage(messageId, userId string) error
 }
 
 type appdbimpl struct {

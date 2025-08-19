@@ -3,40 +3,47 @@ package database
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/dilcetto/wasa/service/components/schema"
 )
 
 var ErrUserDoesNotExist = errors.New("User does not exist")
 
-func (db *appdbimpl) CreateUser(u schema.User) (schema.User, error) {
-	_, err := db.c.Exec("INSERT INTO users(id, name, photo) VALUES (?, ?, ?)", u.Id, u.Name, u.Photo)
+func (db *appdbimpl) CreateUser(u *schema.User) error {
+	// Check if user with the same name already exists
+	var exists bool
+	err := db.c.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE username = ?)", u.Username).Scan(&exists)
 	if err != nil {
-		var existing schema.User
-		if errCheck := db.c.QueryRow("SELECT id, name FROM users WHERE name = ?", u.Name).Scan(&existing.Id, &existing.Name); errCheck != nil {
-			if errCheck == sql.ErrNoRows {
-				return u, err
-			}
-		}
-		return existing, nil
+		return fmt.Errorf("failed to check if username exists: %w", err)
 	}
-	return u, nil
+	if exists {
+		return fmt.Errorf("username %s already exists", u.Username)
+	}
+
+	// Attempt to insert the new user
+	_, err = db.c.Exec("INSERT INTO users(id, username, photo) VALUES (?, ?, ?)", u.ID, u.Username, u.Photo)
+	if err != nil {
+		return fmt.Errorf("failed to create user %s: %w", u.Username, err)
+	}
+	return nil
 }
 
-func (db *appdbimpl) GetUserByName(name string) (schema.User, error) {
+func (db *appdbimpl) GetUserByName(name string) (*schema.User, error) {
 	var u schema.User
-	if err := db.c.QueryRow("SELECT id, name FROM users WHERE name = ?", name).Scan(&u.Id, &u.Name); err != nil {
-		if err == sql.ErrNoRows {
-			return u, ErrUserDoesNotExist
+	err := db.c.QueryRow("SELECT id, username, photoURL FROM users WHERE username = ?", name).Scan(&u.ID, &u.Username, &u.Photo)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrUserDoesNotExist
 		}
-		return u, err
+		return nil, err
 	}
-	return u, nil
+	return &u, nil
 }
 
 func (db *appdbimpl) GetUserById(id string) (schema.User, error) {
 	var u schema.User
-	if err := db.c.QueryRow("SELECT id, name FROM users WHERE id = ?", id).Scan(&u.Id, &u.Name); err != nil {
+	if err := db.c.QueryRow("SELECT id, name FROM users WHERE id = ?", id).Scan(&u.ID, &u.Username); err != nil {
 		if err == sql.ErrNoRows {
 			return u, ErrUserDoesNotExist
 		}
@@ -45,21 +52,21 @@ func (db *appdbimpl) GetUserById(id string) (schema.User, error) {
 	return u, nil
 }
 
-func (db *appdbimpl) UpdateUsername(userId, newName string) (schema.User, error) {
-	res, err := db.c.Exec(`UPDATE users SET name=? WHERE id=?`, newName, userId)
+func (db *appdbimpl) UpdateUsername(userId, newName string) error {
+	res, err := db.c.Exec(`UPDATE users SET username=? WHERE id=?`, newName, userId)
 	if err != nil {
-		return schema.User{}, err
+		return err
 	}
 	affected, err := res.RowsAffected()
 	if err != nil {
-		return schema.User{}, err
+		return err
 	} else if affected == 0 {
-		return schema.User{}, ErrUserDoesNotExist
+		return ErrUserDoesNotExist
 	}
-	return db.GetUserById(userId)
+	return nil
 }
 
-func (db *appdbimpl) UpdateUserPhoto(userID string, photo []byte) error {
+func (db *appdbimpl) UpdateUserPhoto(userID string, photoURL string) error {
 	var exists bool
 	err := db.c.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id=?)`, userID).Scan(&exists)
 	if err != nil {
@@ -68,9 +75,6 @@ func (db *appdbimpl) UpdateUserPhoto(userID string, photo []byte) error {
 	if !exists {
 		return ErrUserDoesNotExist
 	}
-	_, err = db.c.Exec(`UPDATE users SET photo=? WHERE id=?`, photo, userID)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err = db.c.Exec(`UPDATE users SET photoURL=? WHERE id=?`, photoURL, userID)
+	return err
 }

@@ -11,8 +11,8 @@ func (db *appdbimpl) SendMessage(message *schema.Message) error {
 		return fmt.Errorf("message cannot be nil")
 	}
 
-	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, replyTo, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.c.Exec(query, message.ID, message.ConversationID, message.SenderID, message.Content, message.Timestamp, message.Attachment, message.Status, message.ReplyTo, message.ForwardedFrom)
+	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := db.c.Exec(query, message.ID, message.ConversationID, message.SenderID, message.Content, message.Timestamp, message.Attachments, message.MessageStatus, message.ForwardedFrom)
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
@@ -42,10 +42,11 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 	var messages []*schema.Message
 	for rows.Next() {
 		var msg schema.Message
+		var u schema.Sender
 		var senderName, senderPhoto string
 		if err := rows.Scan(
 			&msg.ID, &msg.ConversationID, &msg.SenderID, &msg.Content, &msg.Timestamp,
-			&msg.Attachment, &msg.Status, &msg.ReplyTo, &msg.ForwardedFrom,
+			&msg.Attachments, &msg.MessageStatus, &msg.ForwardedFrom,
 			&senderName, &senderPhoto,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan message: %w", err)

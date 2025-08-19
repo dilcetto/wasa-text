@@ -24,4 +24,5 @@ type Group struct {
 	GroupName  string   `json:"group_name"`
 	GroupPhoto string   `json:"group_photo"`
 	Members    []string `json:"members"`
+	CreatedAt  string   `json:"createdAt"`
 }
