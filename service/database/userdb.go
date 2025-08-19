@@ -8,7 +8,7 @@ import (
 	"github.com/dilcetto/wasa/service/components/schema"
 )
 
-var ErrUserDoesNotExist = errors.New("User does not exist")
+var ErrUserDoesNotExist = errors.New("user does not exist")
 
 func (db *appdbimpl) CreateUser(u *schema.User) error {
 	// Check if user with the same name already exists

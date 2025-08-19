@@ -124,7 +124,6 @@ func New(db *sql.DB) (AppDatabase, error) {
 			timestamp TEXT NOT NULL,
 			attachment BLOB,
 			status TEXT NOT NULL,
-			replyTo TEXT,
 			forwardedFrom TEXT,
 			FOREIGN KEY (conversationId) REFERENCES conversations(id) ON DELETE CASCADE,
 			FOREIGN KEY (senderId) REFERENCES users(id) ON DELETE CASCADE

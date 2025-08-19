@@ -40,10 +40,10 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 	defer rows.Close()
 
 	var messages []*schema.Message
+	var senderName, senderPhoto string
 	for rows.Next() {
 		var msg schema.Message
-		var u schema.Sender
-		var senderName, senderPhoto string
+		// Scan row into msg and senderName, senderPhoto
 		if err := rows.Scan(
 			&msg.ID, &msg.ConversationID, &msg.SenderID, &msg.Content, &msg.Timestamp,
 			&msg.Attachments, &msg.MessageStatus, &msg.ForwardedFrom,
@@ -51,9 +51,9 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan message: %w", err)
 		}
-		// Optionally set these if supported by schema.Message
-		msg.SenderName = senderName
-		msg.SenderPhoto = senderPhoto
+		msg.Sender.ID = msg.SenderID
+		msg.Sender.Username = senderName
+		msg.Sender.Photo = senderPhoto
 		messages = append(messages, &msg)
 	}
 
@@ -70,18 +70,22 @@ func (db *appdbimpl) ForwardMessage(message *schema.Message, userID string) erro
 	}
 
 	// Optionally fetch original content if message.Content is empty
-	if message.Content == "" {
+	if message.Content.Value == "" && message.ForwardedFrom != "" {
 		var originalContent string
 		query := `SELECT content FROM messages WHERE id = ?`
 		err := db.c.QueryRow(query, message.ForwardedFrom).Scan(&originalContent)
 		if err != nil {
 			return fmt.Errorf("original message not found: %w", err)
 		}
-		message.Content = originalContent
+		message.Content = schema.MessageContent{
+			ContentType: schema.TextContent,
+			Value:       originalContent,
+		}
+
 	}
 
-	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, replyTo, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.c.Exec(query, message.ID, message.ConversationID, userID, message.Content, message.Timestamp, message.Attachment, message.Status, message.ReplyTo, message.ForwardedFrom)
+	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := db.c.Exec(query, message.ID, message.ConversationID, userID, message.Content, message.Timestamp, message.Attachments, message.MessageStatus, message.ForwardedFrom)
 	if err != nil {
 		return fmt.Errorf("failed to forward message: %w", err)
 	}

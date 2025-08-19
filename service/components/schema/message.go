@@ -3,6 +3,7 @@ package schema
 type Sender struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
+	Photo    string `json:"photo,omitempty"`
 }
 
 type Message struct {

@@ -13,7 +13,7 @@ func (db *appdbimpl) GetGroupByID(groupID string) (*schema.Group, error) {
 	row := db.c.QueryRow(query, groupID)
 
 	var group schema.Group
-	if err := row.Scan(&group.ID, &group.Name, &group.PhotoURL, &group.CreatedAt); err != nil {
+	if err := row.Scan(&group.ID, &group.GroupName, &group.GroupPhoto, &group.CreatedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("group with ID %s not found", groupID)
 		}
@@ -37,7 +37,7 @@ func (db *appdbimpl) GetMyGroups(userID string) ([]*schema.Group, error) {
 	var groups []*schema.Group
 	for rows.Next() {
 		var group schema.Group
-		if err := rows.Scan(&group.ID, &group.Name, &group.PhotoURL, &group.CreatedAt); err != nil {
+		if err := rows.Scan(&group.ID, &group.GroupName, &group.GroupPhoto, &group.CreatedAt); err != nil {
 			return nil, fmt.Errorf("error scanning group row: %w", err)
 		}
 		groups = append(groups, &group)
@@ -52,7 +52,7 @@ func (db *appdbimpl) GetMyGroups(userID string) ([]*schema.Group, error) {
 
 func (db *appdbimpl) CreateGroup(group *schema.Group) error {
 	query := `INSERT INTO groups (id, name, photo_url, created_at) VALUES (?, ?, ?, ?)`
-	_, err := db.c.Exec(query, group.ID, group.Name, group.PhotoURL, group.CreatedAt)
+	_, err := db.c.Exec(query, group.ID, group.GroupName, group.GroupPhoto, group.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("error creating group: %w", err)
 	}
