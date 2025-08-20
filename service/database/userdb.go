@@ -10,6 +10,29 @@ import (
 
 var ErrUserDoesNotExist = errors.New("user does not exist")
 
+func (db *appdbimpl) SearchUserByName(username string) ([]schema.User, error) {
+	rows, err := db.c.Query("SELECT id, username, photoURL FROM users WHERE username LIKE '%' || ? || '%'", username)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users by name: %w", err)
+	}
+	defer rows.Close()
+
+	var users []schema.User
+	for rows.Next() {
+		var user schema.User
+		if err := rows.Scan(&user.ID, &user.Username, &user.Photo); err != nil {
+			return nil, fmt.Errorf("failed to scan user row: %w", err)
+		}
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over user rows: %w", err)
+	}
+
+	return users, nil
+}
+
 func (db *appdbimpl) CreateUser(u *schema.User) error {
 	// Check if user with the same name already exists
 	var exists bool
@@ -41,15 +64,13 @@ func (db *appdbimpl) GetUserByName(name string) (*schema.User, error) {
 	return &u, nil
 }
 
-func (db *appdbimpl) GetUserById(id string) (schema.User, error) {
-	var u schema.User
-	if err := db.c.QueryRow("SELECT id, name FROM users WHERE id = ?", id).Scan(&u.ID, &u.Username); err != nil {
-		if err == sql.ErrNoRows {
-			return u, ErrUserDoesNotExist
-		}
-		return u, err
+func (db *appdbimpl) GetUserById(userID string) (*schema.User, error) {
+	var user schema.User
+	err := db.c.QueryRow("SELECT id, username, photoURL FROM users WHERE id = ?", userID).Scan(&user.ID, &user.Username, &user.Photo)
+	if err != nil {
+		return nil, err
 	}
-	return u, nil
+	return &user, nil
 }
 
 func (db *appdbimpl) UpdateUsername(userId, newName string) error {

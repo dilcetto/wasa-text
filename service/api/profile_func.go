@@ -5,112 +5,126 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/julienschmidt/httprouter"
-
 	"github.com/dilcetto/wasa/service/api/reqcontext"
-	"github.com/dilcetto/wasa/service/components/requests"
-	"github.com/dilcetto/wasa/service/components/schema"
+	"github.com/dilcetto/wasa/service/database"
+	"github.com/julienschmidt/httprouter"
 )
 
-// post_login handles user login requests
-func (rt *_router) post_login(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	var request requests.Username
-	err := json.NewDecoder(r.Body).Decode(&request)
-	_ = r.Body.Close()
+var ErrUnauthorized = errors.New("unauthorized")
 
-	if err != nil {
-		ctx.Logger.WithError(err).Error("Failed to decode login request")
-		w.WriteHeader(http.StatusBadRequest)
-		return
+func (rt *_router) getAuthenticatedUserID(r *http.Request) (string, error) {
+	authHeader := r.Header.Get("Authorization")
+	if len(authHeader) < 7 || authHeader[:7] != "Bearer " {
+		return "", ErrUnauthorized
 	}
-
-	if !request.IsValid() {
-		ctx.Logger.WithField("Username", request.Username).Error("Invalid username provided")
-		w.WriteHeader(http.StatusBadRequest)
-		return
+	userID := authHeader[7:]
+	if userID == "" {
+		return "", ErrUnauthorized
 	}
-
-	uid, created, err := rt.db.insert_user(request.Username)
-	if err != nil {
-		ctx.Logger.WithError(err).Error("Failed to insert user into database")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	ctx.Logger.Debug("post_login: User inserted successfully")
-	result := schema.LoginResponse{ID: uid}
-	w.Header().Set("Content-Type", "application/json")
-	if created {
-		w.WriteHeader(http.StatusCreated)
-	} else {
-		w.WriteHeader(http.StatusOK)
-	}
-	_ = json.NewEncoder(w).Encode(result)
+	return userID, nil
 }
 
-// patch_username handles requests to change the username of a user
-func (rt *_router) patch_username(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	var request requests.Username
-	err := json.NewDecoder(r.Body).Decode(&request)
-	_ = r.Body.Close()
+func (rt *_router) search_by(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
+	query := r.URL.Query().Get("username")
+	if query == "" {
+		http.Error(w, "Missing username query parameter", http.StatusBadRequest)
+		return
+	}
 
+	user, err := rt.db.SearchUserByName(query)
 	if err != nil {
-		ctx.Logger.WithError(err).Error("Failed to decode username change request")
-		w.WriteHeader(http.StatusBadRequest)
+		ctx.Logger.WithError(err).Error("Failed to get user by name")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	if !request.IsValid() {
-		ctx.Logger.WithField("Username", request.Username).Error("Invalid username provided")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	err = rt.db.update_username(ctx.Uid, request.Username)
-	if errors.Is(err, schema.ErrUsernameAlreadyExists) {
-		ctx.Logger.WithError(err).Error("Failed to update username in database")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	ctx.Logger.Debug("patch_username: Username updated successfully")
-	result := map[string]string{
-		"message":  "Username updated successfully",
-		"username": request.Username,
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(result)
-}
-
-// set_photo handles requests to change the user's profile photo
-func (rt *_router) set_photo(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	var request requests.Photo
-	err := json.NewDecoder(r.Body).Decode(&request)
-	_ = r.Body.Close()
-
-	if err != nil {
-		ctx.Logger.WithError(err).Error("Failed to decode photo change request")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	if !request.IsValid() {
-		ctx.Logger.Error("Invalid photo provided")
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	err = rt.db.update_photo(ctx.Uid, request.Photo)
-	if err != nil {
-		ctx.Logger.WithError(err).Error("Failed to update photo in database")
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	ctx.Logger.Debug("set_photo: Photo updated successfully")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"photoUrl": request.Photo,
-	})
+
+	if user == nil {
+		if err := json.NewEncoder(w).Encode([]string{}); err != nil {
+			ctx.Logger.WithError(err).Error("Failed to encode empty user list")
+			http.Error(w, "Failed to encode empty user list", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	if err := json.NewEncoder(w).Encode(user); err != nil {
+		ctx.Logger.WithError(err).Error("Failed to encode user")
+		http.Error(w, "Failed to encode user", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (rt *_router) setMyUserName(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, err := rt.getAuthenticatedUserID(r)
+	if err != nil {
+		ctx.Logger.WithError(err).Error("Unauthorized access")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		NewUsername string `json:"new_username"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		ctx.Logger.WithError(err).Error("Failed to decode request body")
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.NewUsername) < 3 || len(req.NewUsername) > 16 {
+		http.Error(w, "Username must be between 3 and 16 characters", http.StatusBadRequest)
+		return
+	}
+
+	dbErr := rt.db.UpdateUsername(userID, req.NewUsername)
+	if errors.Is(dbErr, database.ErrUserDoesNotExist) {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	} else if dbErr != nil {
+		ctx.Logger.WithError(dbErr).Error("failed to update username")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (rt *_router) setMyPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	userID, err := rt.getAuthenticatedUserID(r)
+	if err != nil {
+		ctx.Logger.WithError(err).Error("Unauthorized access")
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		NewPhoto string `json:"new_photo"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		ctx.Logger.WithError(err).Error("Failed to decode request body")
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	dbErr := rt.db.UpdateUserPhoto(userID, req.NewPhoto)
+	if errors.Is(dbErr, database.ErrUserDoesNotExist) {
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	} else if dbErr != nil {
+		ctx.Logger.WithError(dbErr).Error("failed to update user photo")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

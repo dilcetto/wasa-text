@@ -43,7 +43,9 @@ type AppDatabase interface {
 	Ping() error
 
 	//user related
+	SearchUserByName(username string) ([]schema.User, error)
 	GetUserByName(username string) (*schema.User, error)
+	GetUserById(id string) (*schema.User, error)
 	CreateUser(user *schema.User) error
 	UpdateUsername(userID, newUsername string) error
 	UpdateUserPhoto(userID, photoURL string) error
