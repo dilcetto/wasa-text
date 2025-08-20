@@ -59,6 +59,7 @@ type AppDatabase interface {
 	//message related
 	SendMessage(message *schema.Message) error
 	GetMessagesByConversationID(conversationID string) ([]*schema.Message, error)
+	GetMessageByID(messageID string) (*schema.Message, error)
 	ForwardMessage(message *schema.Message, userID string) error
 	DeleteMessage(conversationID, messageID, userID string) error
 	MarkMessageStatus(messageID, userID, status string) error

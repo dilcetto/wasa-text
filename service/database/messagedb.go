@@ -64,6 +64,37 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 	return messages, nil
 }
 
+func (db *appdbimpl) GetMessageByID(messageID string) (*schema.Message, error) {
+	query := `SELECT id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom 
+			  FROM messages WHERE id = ?`
+
+	row := db.c.QueryRow(query, messageID)
+
+	var message schema.Message
+	var attachment []byte
+	err := row.Scan(&message.ID, &message.ConversationID, &message.SenderID, &message.Content.Value, &message.Timestamp, &attachment, &message.MessageStatus, &message.ForwardedFrom)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(attachment) > 0 {
+		message.Attachments = []string{string(attachment)} // Or a proper file path/identifier
+		message.Content.ContentType = schema.Image
+		message.MessageType = string(schema.Image)
+	} else {
+		message.Content.ContentType = schema.TextContent
+		message.MessageType = string(schema.TextContent)
+	}
+
+	message.Sender = schema.Sender{
+		ID:       message.SenderID,
+		Username: "", // Optional: fill in if needed
+		Photo:    "", // Optional: fill in if needed
+	}
+
+	return &message, nil
+}
+
 func (db *appdbimpl) ForwardMessage(message *schema.Message, userID string) error {
 	if message == nil || userID == "" || message.ForwardedFrom == "" {
 		return fmt.Errorf("message, user ID, and forwardedFrom cannot be empty")
