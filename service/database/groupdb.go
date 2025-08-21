@@ -70,9 +70,9 @@ func (db *appdbimpl) UpdateGroupName(groupID, newName string) error {
 	return nil
 }
 
-func (db *appdbimpl) UpdateGroupPhoto(groupID, photoURL string) error {
-	query := `UPDATE groups SET photo_url = ? WHERE id = ?`
-	_, err := db.c.Exec(query, photoURL, groupID)
+func (db *appdbimpl) UpdateGroupPhoto(groupID string, photo []byte) error {
+	query := `UPDATE groups SET photo = ? WHERE id = ?`
+	_, err := db.c.Exec(query, photo, groupID)
 	if err != nil {
 		return fmt.Errorf("error updating group photo: %w", err)
 	}

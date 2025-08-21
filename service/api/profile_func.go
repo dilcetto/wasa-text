@@ -108,7 +108,7 @@ func (rt *_router) setMyPhoto(w http.ResponseWriter, r *http.Request, ps httprou
 	}
 
 	var req struct {
-		NewPhoto string `json:"new_photo"`
+		NewPhoto []byte `json:"new_photo"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

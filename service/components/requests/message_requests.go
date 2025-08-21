@@ -1,9 +1,5 @@
 package requests
 
-import (
-	"regexp"
-)
-
 type SendMessageRequest struct {
 	ConversationID string         `json:"conversation_id"`
 	Content        MessageContent `json:"content"`
@@ -18,7 +14,7 @@ func (s *SendMessageRequest) IsValid() bool {
 
 type MessageContent struct {
 	Type  string `json:"type"`
-	Value string `json:"value"`
+	Value []byte `json:"value"`
 }
 
 func (c *MessageContent) IsValid() bool {
@@ -26,8 +22,7 @@ func (c *MessageContent) IsValid() bool {
 		return len(c.Value) >= 1 && len(c.Value) <= 500
 	}
 	if c.Type == "photo" {
-		match, _ := regexp.MatchString("^(http|https)://", c.Value)
-		return match && len(c.Value) >= 1 && len(c.Value) <= 500
+		return len(c.Value) >= 1 && len(c.Value) <= (5*1024*1024) // e.g., up to 5MB
 	}
 	return false
 }

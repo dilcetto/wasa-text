@@ -1,7 +1,6 @@
 package requests
 
 import (
-	"net/url"
 	"regexp"
 )
 
@@ -15,10 +14,9 @@ func (u *UsernameUpdateRequest) IsValid() bool {
 }
 
 type ProfilePhotoUpdateRequest struct {
-	PhotoURL string `json:"photoUrl"`
+	Photo []byte `json:"photo"`
 }
 
 func (u *ProfilePhotoUpdateRequest) IsValid() bool {
-	_, err := url.ParseRequestURI(u.PhotoURL)
-	return err == nil
+	return len(u.Photo) > 0
 }

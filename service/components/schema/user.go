@@ -3,7 +3,7 @@ package schema
 type User struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
-	Photo    string `json:"photo_url"`
+	Photo    []byte `json:"photo"`
 }
 
 type LoginRequest struct {
@@ -18,5 +18,5 @@ type LoginResponse struct {
 type UsernameUpdateResponse = User
 
 type ProfilePhotoUpdateResponse struct {
-	PhotoURL string `json:"photo_url"`
+	Photo []byte `json:"photo"`
 }

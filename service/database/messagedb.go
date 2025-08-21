@@ -40,7 +40,8 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 	defer rows.Close()
 
 	var messages []*schema.Message
-	var senderName, senderPhoto string
+	var senderName string
+	var senderPhoto []byte
 	for rows.Next() {
 		var msg schema.Message
 		// Scan row into msg and senderName, senderPhoto
@@ -88,8 +89,8 @@ func (db *appdbimpl) GetMessageByID(messageID string) (*schema.Message, error) {
 
 	message.Sender = schema.Sender{
 		ID:       message.SenderID,
-		Username: "", // Optional: fill in if needed
-		Photo:    "", // Optional: fill in if needed
+		Username: message.Sender.Username,
+		Photo:    message.Sender.Photo,
 	}
 
 	return &message, nil
@@ -101,7 +102,7 @@ func (db *appdbimpl) ForwardMessage(message *schema.Message, userID string) erro
 	}
 
 	// Optionally fetch original content if message.Content is empty
-	if message.Content.Value == "" && message.ForwardedFrom != "" {
+	if len(message.Content.Value) == 0 && message.ForwardedFrom != "" {
 		var originalContent string
 		query := `SELECT content FROM messages WHERE id = ?`
 		err := db.c.QueryRow(query, message.ForwardedFrom).Scan(&originalContent)
@@ -110,7 +111,7 @@ func (db *appdbimpl) ForwardMessage(message *schema.Message, userID string) erro
 		}
 		message.Content = schema.MessageContent{
 			ContentType: schema.TextContent,
-			Value:       originalContent,
+			Value:       []byte(originalContent),
 		}
 
 	}

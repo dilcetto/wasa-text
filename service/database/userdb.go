@@ -87,7 +87,7 @@ func (db *appdbimpl) UpdateUsername(userId, newName string) error {
 	return nil
 }
 
-func (db *appdbimpl) UpdateUserPhoto(userID string, photoURL string) error {
+func (db *appdbimpl) UpdateUserPhoto(userID string, photo []byte) error {
 	var exists bool
 	err := db.c.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id=?)`, userID).Scan(&exists)
 	if err != nil {
@@ -96,6 +96,6 @@ func (db *appdbimpl) UpdateUserPhoto(userID string, photoURL string) error {
 	if !exists {
 		return ErrUserDoesNotExist
 	}
-	_, err = db.c.Exec(`UPDATE users SET photoURL=? WHERE id=?`, photoURL, userID)
+	_, err = db.c.Exec(`UPDATE users SET photoURL=? WHERE id=?`, photo, userID)
 	return err
 }

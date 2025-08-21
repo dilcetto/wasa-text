@@ -3,7 +3,7 @@ package schema
 type Sender struct {
 	ID       string `json:"id"`
 	Username string `json:"username"`
-	Photo    string `json:"photo,omitempty"`
+	Photo    []byte `json:"photo,omitempty"`
 }
 
 type Message struct {
@@ -29,7 +29,7 @@ const (
 
 type MessageContent struct {
 	ContentType ContentType `json:"type"`
-	Value       string      `json:"value"`
+	Value       []byte      `json:"value"`
 }
 
 type Reaction struct {

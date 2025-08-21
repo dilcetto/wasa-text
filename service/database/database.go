@@ -48,7 +48,7 @@ type AppDatabase interface {
 	GetUserById(id string) (*schema.User, error)
 	CreateUser(user *schema.User) error
 	UpdateUsername(userID, newUsername string) error
-	UpdateUserPhoto(userID, photoURL string) error
+	UpdateUserPhoto(userID string, photo []byte) error
 
 	//conversation related
 	GetMyConversations(userID string) ([]*schema.Conversation, error)
@@ -69,7 +69,7 @@ type AppDatabase interface {
 	GetMyGroups(userID string) ([]*schema.Group, error)
 	CreateGroup(group *schema.Group) error
 	UpdateGroupName(groupID, newName string) error
-	UpdateGroupPhoto(groupID, photoURL string) error
+	UpdateGroupPhoto(groupID string, photo []byte) error
 	AddUserToGroup(groupID, userID string) error
 	LeaveGroup(groupID, userID string) error
 
@@ -100,7 +100,7 @@ func New(db *sql.DB) (AppDatabase, error) {
 		usersTable := `CREATE TABLE users (
 			id TEXT NOT NULL PRIMARY KEY,
 			username TEXT NOT NULL UNIQUE,
-			photoURL TEXT
+			photo BLOB
 		);`
 
 		conversationsTable := `CREATE TABLE conversations (
@@ -108,7 +108,7 @@ func New(db *sql.DB) (AppDatabase, error) {
 			name TEXT NOT NULL,
 			type TEXT NOT NULL CHECK (type IN ('group', 'direct')),
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			conversationPhoto TEXT
+			conversationPhoto BLOB
 		);`
 
 		conversationMembersTable := `CREATE TABLE conversation_members (
@@ -144,7 +144,7 @@ func New(db *sql.DB) (AppDatabase, error) {
 		groupsTable := `CREATE TABLE groups (
 			id TEXT NOT NULL PRIMARY KEY,
 			name TEXT NOT NULL,
-			photoURL TEXT
+			photo BLOB
 		);`
 
 		groupMembersTable := `CREATE TABLE group_members (

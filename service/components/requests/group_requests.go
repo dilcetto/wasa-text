@@ -1,12 +1,8 @@
 package requests
 
-import (
-	"net/url"
-)
-
 type GroupCreateRequest struct {
 	GroupName string   `json:"groupName"`
-	PhotoURL  string   `json:"photo_url"`
+	Photo     []byte   `json:"photo"`
 	Members   []string `json:"members"`
 }
 
@@ -14,7 +10,7 @@ func (g *GroupCreateRequest) IsValid() bool {
 	if len(g.GroupName) < 3 || len(g.GroupName) > 50 {
 		return false
 	}
-	if _, err := url.ParseRequestURI(g.PhotoURL); err != nil {
+	if len(g.Photo) == 0 {
 		return false
 	}
 	for _, member := range g.Members {
@@ -35,9 +31,18 @@ func (a *AddMemberRequest) IsValid() bool {
 }
 
 type LeaveGroupRequest struct {
+	UserID  string `json:"user_id"`
 	GroupID string `json:"group_id"`
 }
 
 func (l *LeaveGroupRequest) IsValid() bool {
-	return len(l.GroupID) > 0
+	return len(l.GroupID) > 0 && len(l.UserID) > 0
+}
+
+type SetGroupNameRequest struct {
+	NewName string `json:"new_name"`
+}
+
+func (u *SetGroupNameRequest) IsValid() bool {
+	return len(u.NewName) > 0
 }

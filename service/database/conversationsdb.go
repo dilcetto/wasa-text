@@ -24,7 +24,7 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, 
 
 	for rows.Next() {
 		var conv schema.Conversation
-		var convPhoto sql.NullString
+		var convPhoto []byte
 		if err := rows.Scan(&conv.ConversationID, &conv.DisplayName, &conv.Type, &conv.CreatedAt, &convPhoto); err != nil {
 			return nil, err
 		}
@@ -43,7 +43,7 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, 
 			}
 		} else {
 			// For group conversations, set the profile photo to the group photo
-			conv.ProfilePhoto = convPhoto.String
+			conv.ProfilePhoto = convPhoto
 		}
 		// Fetch members
 		memberRows, err := db.c.Query(`SELECT userId FROM conversation_members WHERE conversationId = ?`, conv.ConversationID)
@@ -88,7 +88,7 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 		WHERE cm.id = ? AND cm.user_id = ?`
 
 	var conv schema.Conversation
-	var convPhoto sql.NullString
+	var convPhoto []byte
 
 	err := db.c.QueryRow(query, conversationID, userID).Scan(&conv.ConversationID, &conv.DisplayName, &conv.Type, &conv.CreatedAt, &convPhoto)
 	if err != nil {
@@ -111,7 +111,7 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 		}
 	} else {
 		// For group conversations, set the profile photo to the group photo
-		conv.ProfilePhoto = convPhoto.String
+		conv.ProfilePhoto = []byte(convPhoto)
 	}
 
 	// Fetch members

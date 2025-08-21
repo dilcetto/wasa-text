@@ -1,7 +1,6 @@
 package requests
 
 import (
-	"net/url"
 	"regexp"
 )
 
@@ -19,21 +18,13 @@ func (u *LoginRequest) IsValid() bool {
 
 type RegisterRequest struct {
 	Username string `json:"username"`
-	PhotoURL string `json:"photoUrl,omitempty"`
+	Photo    []byte `json:"photo,omitempty"`
 }
 
 func (u *RegisterRequest) IsValid() bool {
 	// Accepts alphanumeric usernames with underscores, 3–16 characters
 	match, _ := regexp.MatchString(`^[a-zA-Z0-9_]{3,16}$`, u.Username)
-	if !match {
-		return false
-	}
-	// Photo URL must be a valid URL if provided
-	if u.PhotoURL != "" {
-		_, err := url.ParseRequestURI(u.PhotoURL)
-		return err == nil
-	}
-	return true
+	return match
 }
 
 type SearchRequest struct {

@@ -5,7 +5,7 @@ import "time"
 type Conversation struct {
 	ConversationID string       `json:"conversationId"`
 	DisplayName    string       `json:"displayName"`
-	ProfilePhoto   string       `json:"profilePhoto,omitempty"`
+	ProfilePhoto   []byte       `json:"profilePhoto,omitempty"`
 	Type           string       `json:"type"`
 	CreatedAt      string       `json:"createdAt"`
 	Members        []string     `json:"membersIds"`
@@ -22,7 +22,7 @@ type LastMessage struct {
 type Group struct {
 	ID         string   `json:"id"`
 	GroupName  string   `json:"group_name"`
-	GroupPhoto string   `json:"group_photo"`
+	GroupPhoto []byte   `json:"group_photo"`
 	Members    []string `json:"members"`
 	CreatedAt  string   `json:"createdAt"`
 }

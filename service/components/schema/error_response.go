@@ -9,4 +9,6 @@ var (
 	ErrReactionDoesNotExist        = errors.New("reaction does not exist")
 	ErrGroupDoesNotExist           = errors.New("group does not exist")
 	ErrUnauthorizedToDeleteMessage = errors.New("unauthorized to delete message")
+	ErrInvalidGroupName            = errors.New("invalid group name")
+	ErrGroupNotFound               = errors.New("group not found")
 )

@@ -157,7 +157,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/PhotoUrl'        
+              $ref: '#/components/schemas/Photo'        
       responses:
         '200':
           description: Profile photo updated successfully
@@ -623,10 +623,10 @@ paths:
               type: object
               description: Object that contains photo
               properties:
-                photoUrl:
+                groupPhoto:
                   type: string
-                  format: uri
-                  description: URL to the new profile or group photo
+                  format: byte
+                  description: Base64-encoded image data
       responses:
         '200':
           description: Group photo updated successfully
@@ -637,15 +637,15 @@ paths:
                 description: Object that contains message
                 required:
                   - message
-                  - photoUrl
+                  - groupPhoto
                 properties:
                   message:
                     type: string
                     description: Confirmation message
-                  photoUrl:
+                  groupPhoto:
                     type: string
-                    format: uri
-                    description: URL to the updated group photo.
+                    format: byte
+                    description: Base64-encoded image data
                   
         '400':
           description: Failed to update group photo
@@ -681,20 +681,20 @@ components:
           maxLength: 36
         username:
           $ref: '#/components/schemas/Username'
-        photoUrl:
+        profilePhoto:
           type: string
-          format: uri
-          description: URL to the user's profile photo
+          format: byte
+          description: Base64-encoded image data
     Username:
       type: string
       pattern: ^[a-zA-Z0-9_]+$
       minLength: 3
       maxLength: 16
       description: A username containing only letters, numbers, or underscores, with a maximum length of 16 characters
-    PhotoUrl: 
+    Photo: 
       type: string
-      format: uri
-      description: URL to the user's profile photo
+      format: byte
+      description: Base64-encoded image data
     Conversation:
       type: object
       description: Represents a user's conversation.
@@ -725,10 +725,10 @@ components:
             $ref: '#/components/schemas/Username'
           minItems: 2
           maxItems: 100
-        profilePhoto:
+        groupPhoto:
           type: string
-          format: uri
-          description: URL to the profile photo of the user or group.
+          format: byte
+          description: Base64-encoded image data
         lastMessage:
           $ref: '#/components/schemas/Message'
         messages:
@@ -799,10 +799,10 @@ components:
           maxItems: 100
         attachments:
           type: array
-          description: List of attachment URLs.
+          description: List of attachments.
           items:
             type: string
-            format: uri
+            format: byte
         forwarded_from:
           type: string
           description: ID of the user this message was forwarded from.
@@ -843,8 +843,8 @@ components:
           maxLength: 50
         groupPhoto:
           type: string
-          format: uri
-          description: URL to the group's profile photo
+          format: byte
+          description: Base64-encoded image data
         members:
           type: array
           description: List of users in the group
