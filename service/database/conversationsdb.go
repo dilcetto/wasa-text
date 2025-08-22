@@ -145,6 +145,28 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 	return &conv, nil
 }
 
+func (db *appdbimpl) SearchConversationByName(name string) ([]schema.Conversation, error) {
+	rows, err := db.c.Query("SELECT id, name, type, created_at, conversationPhoto FROM conversations WHERE name LIKE '%' || ? || '%'", name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search conversations by name: %w", err)
+	}
+	defer rows.Close()
+
+	var conversations []schema.Conversation
+	for rows.Next() {
+		var conv schema.Conversation
+		if err := rows.Scan(&conv.ConversationID, &conv.DisplayName, &conv.Type, &conv.CreatedAt, &conv.ProfilePhoto); err != nil {
+			return nil, fmt.Errorf("failed to scan conversation row: %w", err)
+		}
+		conversations = append(conversations, conv)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over conversation rows: %w", err)
+	}
+
+	return conversations, nil
+}
+
 // CreateConversation inserts a new conversation into the database.
 // This method is kept explicitly to be reused by other internal logic
 // (e.g., auto-creating private conversations during SendMessage) or

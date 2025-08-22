@@ -11,7 +11,7 @@ func (db *appdbimpl) SendMessage(message *schema.Message) error {
 		return fmt.Errorf("message cannot be nil")
 	}
 
-	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err := db.c.Exec(query, message.ID, message.ConversationID, message.SenderID, message.Content, message.Timestamp, message.Attachments, message.MessageStatus, message.ForwardedFrom)
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)

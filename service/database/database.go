@@ -43,7 +43,7 @@ type AppDatabase interface {
 	Ping() error
 
 	//user related
-	SearchUserByName(username string) ([]schema.User, error)
+	SearchUserByUsername(username string) ([]schema.User, error)
 	GetUserByName(username string) (*schema.User, error)
 	GetUserById(id string) (*schema.User, error)
 	CreateUser(user *schema.User) error
@@ -53,6 +53,7 @@ type AppDatabase interface {
 	//conversation related
 	GetMyConversations(userID string) ([]*schema.Conversation, error)
 	GetConversationByID(userID, conversationID string) (*schema.Conversation, error)
+	SearchConversationByName(name string) ([]schema.Conversation, error)
 	CreateConversation(conversation *schema.Conversation) error
 	GetLastMessageByConversationID(conversationID string) (*schema.Message, error)
 

@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/dilcetto/wasa/service/api/reqcontext"
+	"github.com/dilcetto/wasa/service/components/requests"
+	"github.com/dilcetto/wasa/service/components/schema"
 	"github.com/dilcetto/wasa/service/database"
 	"github.com/julienschmidt/httprouter"
 )
@@ -25,33 +27,68 @@ func (rt *_router) getAuthenticatedUserID(r *http.Request) (string, error) {
 }
 
 func (rt *_router) search_by(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	query := r.URL.Query().Get("username")
-	if query == "" {
-		http.Error(w, "Missing username query parameter", http.StatusBadRequest)
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	req := requests.SearchRequest{
+		User:         r.URL.Query().Get("user"),
+		Conversation: r.URL.Query().Get("conversation"),
+	}
+
+	if req.User == "" && req.Conversation == "" {
+		http.Error(w, "Missing query parameters", http.StatusBadRequest)
+		return
+	}
+	if !req.IsValid() {
+		http.Error(w, "Invalid query parameters", http.StatusBadRequest)
 		return
 	}
 
-	user, err := rt.db.SearchUserByName(query)
-	if err != nil {
-		ctx.Logger.WithError(err).Error("Failed to get user by name")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
+	var (
+		users         []schema.User
+		conversations []schema.Conversation
+		err           error
+	)
+
+	if req.User != "" {
+		users, err = rt.db.SearchUserByUsername(req.User)
+		if err != nil {
+			ctx.Logger.WithError(err).Error("Failed to search users by username")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if req.Conversation != "" {
+		var conv *schema.Conversation
+		conv, err = rt.db.GetConversationByID(req.Conversation, req.User)
+		if err != nil {
+			ctx.Logger.WithError(err).Error("Failed to search conversations by ID")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		if conv != nil {
+			conversations = []schema.Conversation{*conv}
+		} else {
+			conversations = []schema.Conversation{}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	if user == nil {
-		if err := json.NewEncoder(w).Encode([]string{}); err != nil {
-			ctx.Logger.WithError(err).Error("Failed to encode empty user list")
-			http.Error(w, "Failed to encode empty user list", http.StatusInternalServerError)
-		}
-		return
+	response := struct {
+		Users         []schema.User         `json:"users"`
+		Conversations []schema.Conversation `json:"conversations"`
+	}{
+		Users:         users,
+		Conversations: conversations,
 	}
 
-	if err := json.NewEncoder(w).Encode(user); err != nil {
-		ctx.Logger.WithError(err).Error("Failed to encode user")
-		http.Error(w, "Failed to encode user", http.StatusInternalServerError)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		ctx.Logger.WithError(err).Error("Failed to encode response")
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
 }

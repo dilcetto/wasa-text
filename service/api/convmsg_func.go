@@ -47,7 +47,7 @@ func (rt *_router) getConversation(w http.ResponseWriter, r *http.Request, ps ht
 		return
 	}
 
-	conversation, err := rt.db.GetConversationByID(conversationID, userID)
+	conversation, err := rt.db.GetConversationByID(userID, conversationID)
 	if err != nil {
 		ctx.Logger.WithError(err).Error("Failed to get conversation")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -110,7 +110,7 @@ func (rt *_router) sendMessage(w http.ResponseWriter, r *http.Request, ps httpro
 }
 
 func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	messageID := ps.ByName("messageID")
+	messageID := ps.ByName("messageId")
 	if messageID == "" {
 		http.Error(w, "Missing message ID", http.StatusBadRequest)
 		return
@@ -200,7 +200,7 @@ func (rt *_router) deleteMessage(w http.ResponseWriter, r *http.Request, ps http
 
 func (rt *_router) setMessageStatus(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	conversationID := ps.ByName("conversationId")
-	messageID := ps.ByName("messageID")
+	messageID := ps.ByName("messageId")
 	if conversationID == "" || messageID == "" {
 		http.Error(w, "Missing conversation or message ID", http.StatusBadRequest)
 		return
