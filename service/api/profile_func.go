@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/dilcetto/wasa/service/api/reqcontext"
 	"github.com/dilcetto/wasa/service/components/requests"
@@ -16,12 +17,19 @@ var ErrUnauthorized = errors.New("unauthorized")
 
 func (rt *_router) getAuthenticatedUserID(r *http.Request) (string, error) {
 	authHeader := r.Header.Get("Authorization")
-	if len(authHeader) < 7 || authHeader[:7] != "Bearer " {
+	if len(authHeader) < 7 || !strings.HasPrefix(authHeader, "Bearer ") {
 		return "", ErrUnauthorized
 	}
-	userID := authHeader[7:]
-	if userID == "" {
+	tokenString := authHeader[7:]
+
+	userID, err := ParseToken(tokenString)
+	if err != nil {
 		return "", ErrUnauthorized
+	}
+	if _, err := rt.db.GetUserById(userID); err != nil {
+		if errors.Is(err, database.ErrUserDoesNotExist) {
+			return "", ErrUnauthorized
+		}
 	}
 	return userID, nil
 }
@@ -105,9 +113,7 @@ func (rt *_router) setMyUserName(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	var req struct {
-		NewUsername string `json:"new_username"`
-	}
+	var req requests.UsernameUpdateRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to decode request body")
@@ -115,12 +121,12 @@ func (rt *_router) setMyUserName(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	if len(req.NewUsername) < 3 || len(req.NewUsername) > 16 {
+	if !req.IsValid() {
 		http.Error(w, "Username must be between 3 and 16 characters", http.StatusBadRequest)
 		return
 	}
 
-	dbErr := rt.db.UpdateUsername(userID, req.NewUsername)
+	dbErr := rt.db.UpdateUsername(userID, req.Username)
 	if errors.Is(dbErr, database.ErrUserDoesNotExist) {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
@@ -144,9 +150,7 @@ func (rt *_router) setMyPhoto(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	var req struct {
-		NewPhoto []byte `json:"new_photo"`
-	}
+	var req requests.ProfilePhotoUpdateRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to decode request body")
@@ -154,7 +158,12 @@ func (rt *_router) setMyPhoto(w http.ResponseWriter, r *http.Request, ps httprou
 		return
 	}
 
-	dbErr := rt.db.UpdateUserPhoto(userID, req.NewPhoto)
+	if !req.IsValid() {
+		http.Error(w, "Invalid photo", http.StatusBadRequest)
+		return
+	}
+
+	dbErr := rt.db.UpdateUserPhoto(userID, req.Photo)
 	if errors.Is(dbErr, database.ErrUserDoesNotExist) {
 		http.Error(w, "User not found", http.StatusNotFound)
 		return
