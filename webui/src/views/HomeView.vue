@@ -1,56 +1,112 @@
-<script>
-export default {
-	data: function() {
-		return {
-			errormsg: null,
-			loading: false,
-			some_data: null,
-		}
-	},
-	methods: {
-		async refresh() {
-			this.loading = true;
-			this.errormsg = null;
-			try {
-				let response = await this.$axios.get("/");
-				this.some_data = response.data;
-			} catch (e) {
-				this.errormsg = e.toString();
-			}
-			this.loading = false;
-		},
-	},
-	mounted() {
-		this.refresh()
-	}
-}
-</script>
-
 <template>
-	<div>
-		<div
-			class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-			<h1 class="h2">Home page</h1>
-			<div class="btn-toolbar mb-2 mb-md-0">
-				<div class="btn-group me-2">
-					<button type="button" class="btn btn-sm btn-outline-secondary" @click="refresh">
-						Refresh
-					</button>
-					<button type="button" class="btn btn-sm btn-outline-secondary" @click="exportList">
-						Export
-					</button>
-				</div>
-				<div class="btn-group me-2">
-					<button type="button" class="btn btn-sm btn-outline-primary" @click="newItem">
-						New
-					</button>
-				</div>
-			</div>
-		</div>
-
-		<ErrorMsg v-if="errormsg" :msg="errormsg"></ErrorMsg>
-	</div>
+	
+  <div class="home-container">
+    <div class="sidebar">
+      <h2 class="logo">WASAText</h2>
+      <input
+        v-model="searchQuery"
+        class="search-bar"
+        type="text"
+        placeholder="Search for a user or conversation"
+      />
+      <div class="user-info">
+        <img :src="user.photo" alt="User Photo" class="user-photo" />
+        <p>{{ user.name }}</p>
+      </div>
+    </div>
+    <div class="chat-list">
+      <div
+        v-for="chat in filteredChats"
+        :key="chat.id"
+        class="chat-preview"
+        @click="viewConversation(chat.id)"
+      >
+        <img :src="'data:image/png;base64,' + (chat.photo || '')" alt="Chat Photo" class="chat-photo" />
+        <div class="chat-details">
+          <h3>{{ chat.name }}</h3>
+          <p v-if="chat.lastMessage" class="last-message">
+            <span v-if="isForwarded(chat.lastMessage)" v-html="getFormattedMessage(chat.lastMessage)"></span>
+            <span v-else>{{ getFormattedMessage(chat.lastMessage) }}</span>
+            <span> • {{ new Date(chat.lastMessage.timestamp).toLocaleString() }}</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
-<style>
-</style>
+<script>
+import axios from 'axios';
+export default {
+  data() {
+    return {
+      searchQuery: '',
+      user: {
+        name: localStorage.getItem('username') || 'Unknown',
+        photo: '/nopfp.jpg',
+      },
+      conversations: [],
+      errormsg: null,
+    };
+  },
+  methods: {
+    async loadConversations() {
+      this.errormsg = null;
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          this.$router.push({ path: "/" });
+          return;
+        }
+        const response = await this.$axios.get("/conversations", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        this.conversations = response.data || [];
+      } catch (error) {
+        console.error("Error loading conversations:", error);
+        this.errormsg = "Failed to load conversations.";
+      }
+    },
+    viewConversation(conversationId) {
+      this.$router.push(`/conversations/${conversationId}`);
+    },
+    truncateText(text, length = 50, clamp = '...') {
+      if (!text || text.length <= length) return text;
+      const lastSpaceIndex = text.substring(0, length).lastIndexOf(' ');
+      return lastSpaceIndex === -1 ? text.substring(0, length) + clamp : text.substring(0, lastSpaceIndex) + clamp;
+    },
+    isForwarded(message) {
+      return message.content.includes("<strong>Forwarded from");
+    },
+    getFormattedMessage(message) {
+      if (this.isForwarded(message)) {
+        return message.content;
+      }
+      return this.truncateText(message.content);
+    },
+  },
+  mounted() {
+    this.loadConversations();
+  },
+  computed: {
+    filteredChats() {
+      const query = this.searchQuery.toLowerCase();
+      return this.conversations.filter(
+        (chat) =>
+          chat.name.toLowerCase().includes(query) ||
+          (chat.lastMessage && chat.lastMessage.content.toLowerCase().includes(query))
+      );
+    },
+  },
+  created() {
+    this.$axios = axios;
+  },
+};
+</script>
+
+
+
+
+

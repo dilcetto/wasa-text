@@ -54,10 +54,20 @@ func (rt *_router) getConversation(w http.ResponseWriter, r *http.Request, ps ht
 		return
 	}
 
-	if err := rt.db.MarkMessageStatus(conversationID, userID, "read"); err != nil {
-		ctx.Logger.WithError(err).Error("Failed to mark messages as read")
+	messages, err := rt.db.GetMessagesByConversationID(conversationID)
+	if err != nil {
+		ctx.Logger.WithError(err).Error("Failed to get messages")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
+	}
+
+	conversation.Messages = messages
+	for _, msg := range messages {
+		if err := rt.db.MarkMessageStatus(msg.ID, userID, "read"); err != nil {
+			ctx.Logger.WithError(err).WithField("message_id", msg.ID).Error("Failed to mark message as read")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
