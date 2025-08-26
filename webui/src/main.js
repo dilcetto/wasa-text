@@ -7,6 +7,7 @@ import LoadingSpinner from './components/LoadingSpinner.vue'
 
 import './assets/dashboard.css'
 import './assets/main.css'
+import '@/assets/theme.css'
 
 const app = createApp(App)
 app.config.globalProperties.$axios = axios;
