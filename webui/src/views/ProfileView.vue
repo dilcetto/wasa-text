@@ -163,7 +163,6 @@ export default {
   box-shadow: 0 10px 30px rgba(0,0,0,.35);
 }
 
-/* header */
 .profile-head {
   display: grid;
   grid-template-columns: auto 1fr;

@@ -11,8 +11,8 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, 
 	query := `
 		SELECT c.id, c.name, c.type, c.created_at, c.conversationPhoto
 		FROM conversations c
-		JOIN conversation_members cm ON cm.conversation_id = c.id
-		WHERE cm.user_id = ?`
+		JOIN conversation_members cm ON cm.conversationId = c.id
+		WHERE cm.userId = ?`
 
 	rows, err := db.c.Query(query, userID)
 	if err != nil {
@@ -30,7 +30,7 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, 
 		}
 
 		// Set the profile photo if it exists
-		if conv.Type == "private" {
+		if conv.Type == "direct" {
 			// Get the other user's info
 			err = db.c.QueryRow(`
 				SELECT u.username, u.photo
@@ -39,7 +39,7 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, 
 				WHERE cm.conversationId = ? AND cm.userId != ?
 			`, conv.ConversationID, userID).Scan(&conv.DisplayName, &conv.ProfilePhoto)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get private conversation info: %w", err)
+				return nil, fmt.Errorf("failed to get direct conversation info: %w", err)
 			}
 		} else {
 			// For group conversations, set the profile photo to the group photo
@@ -84,8 +84,8 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 	query := `
 		SELECT c.id, c.name, c.type, c.created_at, c.conversationPhoto
 		FROM conversations c
-		JOIN conversation_members cm ON cm.conversation_id = c.id
-		WHERE cm.id = ? AND cm.user_id = ?`
+		JOIN conversation_members cm ON cm.conversationId = c.id
+		WHERE cm.conversationId = ? AND cm.userId = ?`
 
 	var conv schema.Conversation
 	var convPhoto []byte
@@ -98,7 +98,7 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 		return nil, fmt.Errorf("failed to get conversation: %w", err)
 	}
 
-	if conv.Type == "private" {
+	if conv.Type == "direct" {
 		// Get the other user's info
 		err = db.c.QueryRow(`
 			SELECT u.username, u.photo
@@ -107,7 +107,7 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 			WHERE cm.conversationId = ? AND cm.userId != ?
 		`, conv.ConversationID, userID).Scan(&conv.DisplayName, &conv.ProfilePhoto)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get private conversation info: %w", err)
+			return nil, fmt.Errorf("failed to get direct conversation info: %w", err)
 		}
 	} else {
 		// For group conversations, set the profile photo to the group photo
@@ -169,7 +169,7 @@ func (db *appdbimpl) SearchConversationByName(name string) ([]schema.Conversatio
 
 // CreateConversation inserts a new conversation into the database.
 // This method is kept explicitly to be reused by other internal logic
-// (e.g., auto-creating private conversations during SendMessage) or
+// (e.g., auto-creating direct conversations during SendMessage) or
 // for explicit group chat creation if needed in the future.
 func (db *appdbimpl) CreateConversation(conversation *schema.Conversation) error {
 	query := `
@@ -193,19 +193,30 @@ func (db *appdbimpl) CreateConversation(conversation *schema.Conversation) error
 
 func (db *appdbimpl) GetLastMessageByConversationID(conversationID string) (*schema.Message, error) {
 	query := `
-		SELECT id, content, timestamp, sender, attachment
+		SELECT id, content, timestamp, senderId, attachment
 		FROM messages
 		WHERE conversationId = ?
 		ORDER BY timestamp DESC LIMIT 1`
 
 	var msg schema.Message
-	err := db.c.QueryRow(query, conversationID).Scan(&msg.ID, &msg.Content, &msg.Timestamp, &msg.Sender, &msg.Attachments)
+	var attachment []byte
+	err := db.c.QueryRow(query, conversationID).Scan(&msg.ID, &msg.Content.Value, &msg.Timestamp, &msg.SenderID, &attachment)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("no messages found for conversation %s", conversationID)
 		}
 		return nil, fmt.Errorf("failed to get last message: %w", err)
 	}
+
+	if len(attachment) > 0 {
+		msg.Attachments = []string{string(attachment)}
+		msg.Content.ContentType = schema.Image
+		msg.MessageType = string(schema.Image)
+	} else {
+		msg.Content.ContentType = schema.TextContent
+		msg.MessageType = string(schema.TextContent)
+	}
+	msg.Sender.ID = msg.SenderID
 
 	return &msg, nil
 }

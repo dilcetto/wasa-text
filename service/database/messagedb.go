@@ -12,7 +12,11 @@ func (db *appdbimpl) SendMessage(message *schema.Message) error {
 	}
 
 	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.c.Exec(query, message.ID, message.ConversationID, message.SenderID, message.Content, message.Timestamp, message.Attachments, message.MessageStatus, message.ForwardedFrom)
+	var attachment []byte
+	if len(message.Attachments) > 0 {
+		attachment = []byte(message.Attachments[0])
+	}
+	_, err := db.c.Exec(query, message.ID, message.ConversationID, message.SenderID, message.Content.Value, message.Timestamp, attachment, message.MessageStatus, message.ForwardedFrom)
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
@@ -28,7 +32,7 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 	SELECT 
 	  m.id, m.conversationId, m.senderId, m.content, m.timestamp, 
 	  m.attachment, m.status, m.forwardedFrom,
-	  u.name, u.photo
+	  u.username, u.photo
 	FROM messages m
 	JOIN users u ON m.senderId = u.id
 	WHERE m.conversationId = ?
@@ -44,14 +48,24 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 	var senderPhoto []byte
 	for rows.Next() {
 		var msg schema.Message
+		var attachment []byte
 		// Scan row into msg and senderName, senderPhoto
 		if err := rows.Scan(
 			&msg.ID, &msg.ConversationID, &msg.SenderID, &msg.Content, &msg.Timestamp,
-			&msg.Attachments, &msg.MessageStatus, &msg.ForwardedFrom,
+			&attachment, &msg.MessageStatus, &msg.ForwardedFrom,
 			&senderName, &senderPhoto,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan message: %w", err)
 		}
+		if len(attachment) > 0 {
+			msg.Attachments = []string{string(attachment)}
+			msg.Content.ContentType = schema.Image
+			msg.MessageType = string(schema.Image)
+		} else {
+			msg.Content.ContentType = schema.TextContent
+			msg.MessageType = string(schema.TextContent)
+		}
+
 		msg.Sender.ID = msg.SenderID
 		msg.Sender.Username = senderName
 		msg.Sender.Photo = senderPhoto
@@ -117,7 +131,11 @@ func (db *appdbimpl) ForwardMessage(message *schema.Message, userID string) erro
 	}
 
 	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-	_, err := db.c.Exec(query, message.ID, message.ConversationID, userID, message.Content, message.Timestamp, message.Attachments, message.MessageStatus, message.ForwardedFrom)
+	var attachment []byte
+	if len(message.Attachments) > 0 {
+		attachment = []byte(message.Attachments[0])
+	}
+	_, err := db.c.Exec(query, message.ID, message.ConversationID, userID, message.Content.Value, message.Timestamp, attachment, message.MessageStatus, message.ForwardedFrom)
 	if err != nil {
 		return fmt.Errorf("failed to forward message: %w", err)
 	}

@@ -712,8 +712,8 @@ components:
           maxLength: 100
         type:
           type: string
-          enum: [private, group]
-          description: Indicates whether the conversation is a private chat or a group conversation.
+          enum: [direct, group]
+          description: Indicates whether the conversation is a direct chat or a group conversation.
         createdAt:
           type: string
           format: date-time

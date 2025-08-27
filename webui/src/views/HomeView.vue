@@ -16,13 +16,13 @@
     <div class="chat-list">
       <div
         v-for="chat in filteredChats"
-        :key="chat.id"
+        :key="chat.conversationId"
         class="chat-preview"
-        @click="viewConversation(chat.id)"
+        @click="viewConversation(chat.conversationId)"
       >
-        <img :src="'data:image/png;base64,' + (chat.photo || '')" alt="Chat Photo" class="chat-photo" />
+        <img :src="'data:image/png;base64,' + (chat.profilePhoto || '')" alt="Chat Photo" class="chat-photo" />
         <div class="chat-details">
-          <h3>{{ chat.name }}</h3>
+          <h3>{{ chat.displayName }}</h3>
           <p v-if="chat.lastMessage" class="last-message">
             <span v-if="isForwarded(chat.lastMessage)" v-html="getFormattedMessage(chat.lastMessage)"></span>
             <span v-else>{{ getFormattedMessage(chat.lastMessage) }}</span>
@@ -79,13 +79,13 @@ export default {
       return lastSpaceIndex === -1 ? text.substring(0, length) + clamp : text.substring(0, lastSpaceIndex) + clamp;
     },
     isForwarded(message) {
-      return message.content.includes("<strong>Forwarded from");
+      return message.preview.includes("<strong>Forwarded from");
     },
     getFormattedMessage(message) {
       if (this.isForwarded(message)) {
-        return message.content;
+        return message.preview;
       }
-      return this.truncateText(message.content);
+      return this.truncateText(message.preview);
     },
   },
   mounted() {
@@ -96,8 +96,8 @@ export default {
       const query = this.searchQuery.toLowerCase();
       return this.conversations.filter(
         (chat) =>
-          chat.name.toLowerCase().includes(query) ||
-          (chat.lastMessage && chat.lastMessage.content.toLowerCase().includes(query))
+          chat.displayName.toLowerCase().includes(query) ||
+          (chat.lastMessage && chat.lastMessage.preview.toLowerCase().includes(query))
       );
     },
   },
