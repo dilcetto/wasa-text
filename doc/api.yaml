@@ -167,10 +167,10 @@ paths:
                 type: object
                 description: Object that contains photo.
                 properties: 
-                  photoUrl:
+                  photo:
                     type: string
-                    format: uri
-                    description: URL to the updated profile photo.
+                    format: byte
+                    description: Base64-encoded string of the updated profile photo.
         '400':
           description: Failed to update profile photo due to invalid input.
           content:

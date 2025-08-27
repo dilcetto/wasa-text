@@ -40,15 +40,15 @@ export default {
           },
         });
 
-        const {token, user} = response.data;
+        const {token, id, username: name} = response.data;
 
-        if (token && user) {
+        if (token && id && name) {
           localStorage.setItem('token', token);
-          localStorage.setItem('username', user.username);
-          localStorage.setItem('userId', user.id);
+          localStorage.setItem('username', name);
+          localStorage.setItem('userId', id);
           this.$router.push('/home');
         } else {
-          this.error = 'Login failed: No token received';
+          this.error = 'Login failed: Invalid response from server';
         }
 
       } catch (error) {

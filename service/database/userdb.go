@@ -31,7 +31,7 @@ func (db *appdbimpl) CreateUser(u *schema.User) error {
 
 func (db *appdbimpl) GetUserByName(name string) (*schema.User, error) {
 	var u schema.User
-	err := db.c.QueryRow("SELECT id, username, photoURL FROM users WHERE username = ?", name).Scan(&u.ID, &u.Username, &u.Photo)
+	err := db.c.QueryRow("SELECT id, username, photo FROM users WHERE username = ?", name).Scan(&u.ID, &u.Username, &u.Photo)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrUserDoesNotExist
@@ -43,7 +43,7 @@ func (db *appdbimpl) GetUserByName(name string) (*schema.User, error) {
 
 func (db *appdbimpl) GetUserById(userID string) (*schema.User, error) {
 	var user schema.User
-	err := db.c.QueryRow("SELECT id, username, photoURL FROM users WHERE id = ?", userID).Scan(&user.ID, &user.Username, &user.Photo)
+	err := db.c.QueryRow("SELECT id, username, photo FROM users WHERE id = ?", userID).Scan(&user.ID, &user.Username, &user.Photo)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func (db *appdbimpl) GetUserById(userID string) (*schema.User, error) {
 
 func (db *appdbimpl) SearchUserByUsername(username string) ([]schema.User, error) {
 	var users []schema.User
-	rows, err := db.c.Query("SELECT id, username, photoURL FROM users WHERE username LIKE ?", "%"+username+"%")
+	rows, err := db.c.Query("SELECT id, username, photo FROM users WHERE username LIKE ?", "%"+username+"%")
 	if err != nil {
 		return nil, fmt.Errorf("failed to search users by username: %w", err)
 	}
@@ -91,6 +91,6 @@ func (db *appdbimpl) UpdateUserPhoto(userID string, photo []byte) error {
 	if !exists {
 		return ErrUserDoesNotExist
 	}
-	_, err = db.c.Exec(`UPDATE users SET photoURL=? WHERE id=?`, photo, userID)
+	_, err = db.c.Exec(`UPDATE users SET photo=? WHERE id=?`, photo, userID)
 	return err
 }

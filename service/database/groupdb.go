@@ -9,7 +9,7 @@ import (
 )
 
 func (db *appdbimpl) GetGroupByID(groupID string) (*schema.Group, error) {
-	query := `SELECT id, name, photo_url, created_at FROM groups WHERE id = ?`
+	query := `SELECT id, name, photo, created_at FROM groups WHERE id = ?`
 	row := db.c.QueryRow(query, groupID)
 
 	var group schema.Group
@@ -24,7 +24,7 @@ func (db *appdbimpl) GetGroupByID(groupID string) (*schema.Group, error) {
 }
 
 func (db *appdbimpl) GetMyGroups(userID string) ([]*schema.Group, error) {
-	query := `SELECT g.id, g.name, g.photo_url, g.created_at 
+	query := `SELECT g.id, g.name, g.photo, g.created_at 
 			  FROM groups g 
 			  JOIN group_members gm ON g.id = gm.group_id 
 			  WHERE gm.user_id = ?`
@@ -51,7 +51,7 @@ func (db *appdbimpl) GetMyGroups(userID string) ([]*schema.Group, error) {
 }
 
 func (db *appdbimpl) CreateGroup(group *schema.Group) error {
-	query := `INSERT INTO groups (id, name, photo_url, created_at) VALUES (?, ?, ?, ?)`
+	query := `INSERT INTO groups (id, name, photo, created_at) VALUES (?, ?, ?, ?)`
 	_, err := db.c.Exec(query, group.ID, group.GroupName, group.GroupPhoto, group.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("error creating group: %w", err)

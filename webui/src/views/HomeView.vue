@@ -1,5 +1,4 @@
 <template>
-	
   <div class="home-container">
     <div class="sidebar">
       <h2 class="logo">WASAText</h2>
@@ -36,8 +35,10 @@
 </template>
 
 <script>
-import axios from 'axios';
+import ErrorMsg from '../components/ErrorMsg.vue';
+
 export default {
+  
   data() {
     return {
       searchQuery: '',
@@ -99,9 +100,6 @@ export default {
           (chat.lastMessage && chat.lastMessage.content.toLowerCase().includes(query))
       );
     },
-  },
-  created() {
-    this.$axios = axios;
   },
 };
 </script>

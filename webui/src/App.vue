@@ -1,67 +1,86 @@
 <script setup>
 import { RouterLink, RouterView } from 'vue-router'
 </script>
-<script>
-export default {}
-</script>
 
 <template>
+  <div class="app">
+    <!-- topbar -->
+    <header class="app-header">
+      <RouterLink to="/" class="logo">WASAText</RouterLink>
+    </header>
 
-	<header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
-		<a class="navbar-brand col-md-3 col-lg-2 me-0 px-3 fs-6" href="#/">Example App</a>
-		<button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
-			<span class="navbar-toggler-icon"></span>
-		</button>
-	</header>
+    <!-- layout -->
+    <div class="app-body">
+      <!-- sidebar -->
+      <aside class="app-sidebar">
+        <nav>
+          <h6>General</h6>
+          <ul>
+            <li><RouterLink to="/home">My Conversations</RouterLink></li>
+            <li><RouterLink to="/profile">My Profile</RouterLink></li>
+            <li><RouterLink to="/search">Search People/Chats</RouterLink></li>
+          </ul>
 
-	<div class="container-fluid">
-		<div class="row">
-			<nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
-				<div class="position-sticky pt-3 sidebar-sticky">
-					<h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
-						<span>General</span>
-					</h6>
-					<ul class="nav flex-column">
-						<li class="nav-item">
-							<RouterLink to="/" class="nav-link">
-								<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#home"/></svg>
-								Home
-							</RouterLink>
-						</li>
-						<li class="nav-item">
-							<RouterLink to="/link1" class="nav-link">
-								<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#layout"/></svg>
-								Menu item 1
-							</RouterLink>
-						</li>
-						<li class="nav-item">
-							<RouterLink to="/link2" class="nav-link">
-								<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#key"/></svg>
-								Menu item 2
-							</RouterLink>
-						</li>
-					</ul>
+          <h6>Groups</h6>
+          <ul>
+            <li><RouterLink to="/groups">My Groups</RouterLink></li>
+          </ul>
+        </nav>
+      </aside>
 
-					<h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-4 mb-1 text-muted text-uppercase">
-						<span>Secondary menu</span>
-					</h6>
-					<ul class="nav flex-column">
-						<li class="nav-item">
-							<RouterLink :to="'/some/' + 'variable_here' + '/path'" class="nav-link">
-								<svg class="feather"><use href="/feather-sprite-v4.29.0.svg#file-text"/></svg>
-								Item 1
-							</RouterLink>
-						</li>
-					</ul>
-				</div>
-			</nav>
-
-			<main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-				<RouterView />
-			</main>
-		</div>
-	</div>
+      <!-- main slot -->
+      <main class="app-main">
+        <RouterView />
+      </main>
+    </div>
+  </div>
 </template>
 
 <style>
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.app-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.logo {
+  font-weight: 700;
+  text-decoration: none;
+  color: var(--text);
+}
+.app-body {
+  flex: 1;
+  display: flex;
+}
+.app-sidebar {
+  width: 220px;
+  border-right: 1px solid var(--border);
+  padding: 1rem;
+}
+.app-sidebar h6 {
+  margin: 1rem 0 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.app-sidebar ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.app-sidebar li {
+  margin: 0.25rem 0;
+}
+.app-sidebar a {
+  text-decoration: none;
+  color: var(--text);
+}
+.app-main {
+  flex: 1;
+  padding: 1rem;
+}
 </style>

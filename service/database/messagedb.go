@@ -27,7 +27,7 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 	query := `
 	SELECT 
 	  m.id, m.conversationId, m.senderId, m.content, m.timestamp, 
-	  m.attachment, m.status, m.replyTo, m.forwardedFrom,
+	  m.attachment, m.status, m.forwardedFrom,
 	  u.name, u.photo
 	FROM messages m
 	JOIN users u ON m.senderId = u.id

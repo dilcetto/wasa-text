@@ -33,7 +33,7 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, 
 		if conv.Type == "private" {
 			// Get the other user's info
 			err = db.c.QueryRow(`
-				SELECT u.username, u.photoURL
+				SELECT u.username, u.photo
 				FROM users u
 				JOIN conversation_members cm ON cm.userId = u.id
 				WHERE cm.conversationId = ? AND cm.userId != ?
@@ -101,7 +101,7 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 	if conv.Type == "private" {
 		// Get the other user's info
 		err = db.c.QueryRow(`
-			SELECT u.username, u.photoURL
+			SELECT u.username, u.photo
 			FROM users u
 			JOIN conversation_members cm ON cm.userId = u.id
 			WHERE cm.conversationId = ? AND cm.userId != ?
