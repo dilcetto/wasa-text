@@ -37,7 +37,7 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 	JOIN users u ON m.senderId = u.id
 	WHERE m.conversationId = ?
 	ORDER BY m.timestamp ASC`
-	rows, err := db.c.Query(query, conversationID)
+    rows, err := db.c.Query(query, conversationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get messages: %w", err)
 	}
@@ -50,13 +50,13 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 		var msg schema.Message
 		var attachment []byte
 		// Scan row into msg and senderName, senderPhoto
-		if err := rows.Scan(
-			&msg.ID, &msg.ConversationID, &msg.SenderID, &msg.Content, &msg.Timestamp,
-			&attachment, &msg.MessageStatus, &msg.ForwardedFrom,
-			&senderName, &senderPhoto,
-		); err != nil {
-			return nil, fmt.Errorf("failed to scan message: %w", err)
-		}
+        if err := rows.Scan(
+            &msg.ID, &msg.ConversationID, &msg.SenderID, &msg.Content.Value, &msg.Timestamp,
+            &attachment, &msg.MessageStatus, &msg.ForwardedFrom,
+            &senderName, &senderPhoto,
+        ); err != nil {
+            return nil, fmt.Errorf("failed to scan message: %w", err)
+        }
 		if len(attachment) > 0 {
 			msg.Attachments = []string{string(attachment)}
 			msg.Content.ContentType = schema.Image

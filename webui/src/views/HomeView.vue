@@ -14,6 +14,7 @@
       </div>
     </div>
     <div class="chat-list">
+      <ErrorMsg v-if="errormsg" :msg="errormsg" />
       <div
         v-for="chat in filteredChats"
         :key="chat.conversationId"
@@ -38,7 +39,11 @@
 import ErrorMsg from '../components/ErrorMsg.vue';
 
 export default {
-  
+  name: 'HomeView',
+  components: {
+    ErrorMsg
+  },
+
   data() {
     return {
       searchQuery: '',
@@ -48,6 +53,7 @@ export default {
       },
       conversations: [],
       errormsg: null,
+      pollIntervalId: null,
     };
   },
   methods: {
@@ -87,9 +93,24 @@ export default {
       }
       return this.truncateText(message.preview);
     },
+    refresh() {
+      this.loadConversations();
+    },
+    logOut() {
+      localStorage.clear();
+      this.$router.push({ path: '/login' });
+    },
+    newGroup() {
+      this.$router.push({ path: '/new-group' });
+    }
   },
   mounted() {
+    this.username = localStorage.getItem('username') || 'Unknown';
     this.loadConversations();
+    this.pollIntervalId = setInterval(() => this.loadConversations(), 10000);
+  },
+  unmounted() {
+    clearInterval(this.pollIntervalId);
   },
   computed: {
     filteredChats() {
@@ -217,7 +238,6 @@ export default {
   background: var(--bg-alt);
 }
 </style>
-
 
 
 

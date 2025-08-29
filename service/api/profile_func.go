@@ -68,20 +68,14 @@ func (rt *_router) search_by(w http.ResponseWriter, r *http.Request, ps httprout
 		}
 	}
 
-	if req.Conversation != "" {
-		var conv *schema.Conversation
-		conv, err = rt.db.GetConversationByID(req.Conversation, req.User)
-		if err != nil {
-			ctx.Logger.WithError(err).Error("Failed to search conversations by ID")
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		if conv != nil {
-			conversations = []schema.Conversation{*conv}
-		} else {
-			conversations = []schema.Conversation{}
-		}
-	}
+    if req.Conversation != "" {
+        conversations, err = rt.db.SearchConversationByName(req.Conversation)
+        if err != nil {
+            ctx.Logger.WithError(err).Error("Failed to search conversations by name")
+            http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+            return
+        }
+    }
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

@@ -40,12 +40,18 @@ export default {
           },
         });
 
-        const {token, id, username: name} = response.data;
+        const data = response.data || {};
+        const token = data.token;
+        // Backend returns user fields at top-level (embedded), not under `user`
+        const parsedUser = data.user || { id: data.id, username: data.username, photo: data.photo };
 
-        if (token && id && name) {
+        if (token && parsedUser && parsedUser.id && parsedUser.username) {
           localStorage.setItem('token', token);
-          localStorage.setItem('username', name);
-          localStorage.setItem('userId', id);
+          localStorage.setItem('username', parsedUser.username);
+          localStorage.setItem('userId', parsedUser.id);
+          if (parsedUser.photo) {
+            localStorage.setItem('userPhoto', `data:image/png;base64,${parsedUser.photo}`);
+          }
           this.$router.push('/home');
         } else {
           this.error = 'Login failed: Invalid response from server';

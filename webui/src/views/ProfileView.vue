@@ -82,6 +82,12 @@ export default {
         },
     },
     methods: {
+        initFromLocal() {
+          const name = localStorage.getItem('username') || '';
+          const photo = localStorage.getItem('userPhoto') || '';
+          this.username = name;
+          this.user.photo = photo;
+        },
         startChat() {
             this.$router.push('/home'); //fix up later /chat
         },
@@ -89,39 +95,73 @@ export default {
             localStorage.clear();
             this.$router.push('/login');
         },
-
-        updateUsername() {
-            if (this.canUpdateUsername) return
-            this.username = this.newUsername.trim();
-            localStorage.setItem('username', this.username);
-            this.newUsername = '';
-            this.errormsg = null;
+ 
+        async updateUsername() {
+            if (!this.newUsername || this.newUsername === this.username) return;
+            try {
+              const token = localStorage.getItem('token');
+              await axios.put('/user/username', { username: this.newUsername }, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                alert('Username updated successfully!');
+                this.username = this.newUsername;
+                localStorage.setItem('username', this.username);
+                this.newUsername = '';
+                this.errormsg = null;
+            } catch (error) {
+                console.error('Error updating username:', error);
+                this.errormsg = error.response?.data?.message || 'Failed to update username.';
+            }
+        },
+        refresh() {
+            this.fetchProfile();
         },
 
         handlePhotoUpload(e) {
-            const file = e?.target?.files[0]
-            if (!file) return
+            const file = e?.target?.files?.[0];
+            if (!file) return;
             if (!file.type.startsWith('image/')) {
-                this.errormsg = 'Please upload a valid image file.'
-                return
+                this.errormsg = 'Please upload a valid image file.';
+                return;
             }
-            const reader = new FileReader()
+            const reader = new FileReader();
             reader.onload = () => {
-                this.newPhoto = reader.result
-                this.errormsg = null
-            }
+                this.newPhoto = reader.result;
+                this.errormsg = null;
+            };
             reader.onerror = () => {
-                this.errormsg = 'Error reading file.'
-            }
-            reader.readAsDataURL(file)
+                this.errormsg = 'Error reading file.';
+            };
+            reader.readAsDataURL(file);
         },
-        updatePhoto() {
+        async updatePhoto() {
             if (!this.newPhoto) return
-            this.user.photo = this.newPhoto
-            localStorage.setItem('userPhoto', this.user.photo)
-            this.newPhoto = null
-            this.errormsg = null
+            try {
+                const token = localStorage.getItem('token');
+                await axios.put('/user/photo', { photo: this.newPhoto }, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                this.user.photo = this.newPhoto
+                localStorage.setItem('userPhoto', this.user.photo)
+                this.newPhoto = null
+                this.errormsg = null
+            } catch (error) {
+                console.error('Error updating photo:', error);
+                this.errormsg = error.response?.data?.message || 'Failed to update photo.';
+            }
         },
+    },
+    mounted() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            this.$router.push('/login');
+            return;
+        }
+        this.initFromLocal();
     },
 }
 </script>
