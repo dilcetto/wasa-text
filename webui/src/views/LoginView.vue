@@ -47,12 +47,16 @@ export default {
 
         if (token && parsedUser && parsedUser.id && parsedUser.username) {
           localStorage.setItem('token', token);
+          try { localStorage.removeItem('accessToken'); } catch (e) {}
           localStorage.setItem('username', parsedUser.username);
           localStorage.setItem('userId', parsedUser.id);
           if (parsedUser.photo) {
             localStorage.setItem('userPhoto', `data:image/png;base64,${parsedUser.photo}`);
           }
-          this.$router.push('/home');
+          // update axios default header so subsequent requests are authenticated
+          try { this.$axios.defaults.headers.common['Authorization'] = `Bearer ${token}` } catch (e) {}
+          const redirect = this.$route.query.redirect || '/home';
+          this.$router.push(redirect);
         } else {
           this.error = 'Login failed: Invalid response from server';
         }

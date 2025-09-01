@@ -15,6 +15,7 @@
 
     <LoadingSpinner :loading="loading">
       <ErrorMsg v-if="errorMessage" :msg="errorMessage" />
+      <div v-if="toast.show" class="toast">{{ toast.msg }}</div>
 
       <div ref="scrollArea" class="messages">
         <div
@@ -55,6 +56,7 @@
           type="text"
           placeholder="Type your message..."
           @keyup.enter="send"
+          ref="messageInput"
         />
         <button class="btn" :disabled="!canSend || sending" @click="send">{{ sending ? 'Sending…' : 'Send' }}</button>
       </footer>
@@ -69,7 +71,7 @@
             </option>
           </select>
           <div class="forward-actions">
-            <button class="btn" :disabled="!forward.target || forwarding" @click="doForward">{{ forwarding ? 'Forwarding…' : 'Forward' }}</button>
+            <button class="btn" :disabled="!forward.target || forward.target === conversationId || forwarding" @click="doForward">{{ forwarding ? 'Forwarding…' : 'Forward' }}</button>
             <button class="btn secondary" @click="closeForward">Cancel</button>
           </div>
         </div>
@@ -87,7 +89,8 @@ export default {
             sending: false,
             forwarding: false,
             errorMessage: null,
-            newMessage: '', 
+            newMessage: '',
+            toast: { show: false, msg: "" },
             conversation: {
                 id: null,
                 displayName: '',
@@ -117,14 +120,7 @@ methods: {
     async load() {
         this.errorMessage = null;
         try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                this.$router.push('/login');
-                return;
-            }
-            const response = await this.$axios.get(`/conversations/${this.conversationId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const response = await this.$axios.get(`/conversations/${this.conversationId}`);
             // backend return message.content as base64
             this.conversation = response.data || {};
             this.$nextTick(this.scrollToBottom);
@@ -137,34 +133,30 @@ methods: {
     },
     async loadConversationsList() {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) return;
-            const res = await this.$axios.get('/conversations', { headers: { Authorization: `Bearer ${token}` }});
+            const res = await this.$axios.get('/conversations');
             this.allConversations = res.data || [];
-        } catch (e) {
-            console.error('Failed to load conversations list', e);
-        }
+      } catch (e) {
+        console.error('Failed to load conversations list', e);
+      }
+    },
+    showToast(msg) {
+      this.toast = { show: true, msg };
+      setTimeout(() => { this.toast.show = false; }, 2000);
     },
     async send() {
         if (!this.canSend || this.sending) return;
         this.sending = true;
         this.errorMessage = null;
         try {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                this.$router.push('/login');
-                return;
-            }
             const messagePayload = {
                 content: {
                     type: 'text',
                     value: this.toBase64(this.newMessage)
                 },
             };
-            await this.$axios.post(`/conversations/${this.conversationId}/messages`, messagePayload, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            await this.$axios.post(`/conversations/${this.conversationId}/messages`, messagePayload);
             this.newMessage = '';
+            this.showToast("Message sent.");
             await this.load();
         } catch (error) {
             console.error('Error sending message:', error);
@@ -172,20 +164,23 @@ methods: {
         } finally {
             this.sending = false;
         }
+        this.$nextTick(() => {
+          this.$refs.messageInput?.focus();
+        });
     },
-    async del(messageId) {
-        if (!messageId) return;
-        try {
-            const token = localStorage.getItem('token');
-            await this.$axios.delete(`/conversations/${this.conversationId}/messages/${messageId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            await this.load();
-        } catch (e) {
-            console.error('Failed to delete message', e);
-            this.errorMessage = 'Failed to delete message';
-        }
+   async del(messageId) {
+    if (!messageId) return;
+    if (!confirm("Are you sure you want to delete this message?")) return;
+    try {
+        await this.$axios.delete(`/conversations/${this.conversationId}/messages/${messageId}`);
+        this.showToast("Message deleted.");
+        await this.load();
+      } catch (e) {
+        console.error('Failed to delete message', e);
+        this.errorMessage = 'Failed to delete message';
+      }
     },
+
     openForward(messageId) {
         this.forward = { open: true, messageId, target: '' };
         if (!this.allConversations?.length) this.loadConversationsList();
@@ -197,16 +192,17 @@ methods: {
         if (!this.forward.messageId || !this.forward.target) return;
         this.forwarding = true;
         try {
-            const token = localStorage.getItem('token');
-            await this.$axios.post(`/conversations/${this.conversationId}/messages/${this.forward.messageId}/forward`, { targetConversationId: this.forward.target }, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            await this.$axios.post(`/conversations/${this.conversationId}/messages/${this.forward.messageId}/forward`, { targetConversationId: this.forward.target });
+            this.showToast("Message forwarded.");
             this.closeForward();
         } catch (e) {
             console.error('Failed to forward message', e);
             this.errorMessage = 'Failed to forward message';
         } finally {
             this.forwarding = false;
+        this.$nextTick(() => {
+          this.$refs.messageInput?.focus();
+        });
         }
     },
     isOwn(message) {
@@ -240,6 +236,9 @@ methods: {
   mounted() {
     this.load();
     this.pollId = setInterval(() => this.load(), 10000);
+    this.$nextTick(() => {
+      this.$refs.messageInput?.focus();
+    });
   },
   unmounted() {
     if (this.pollId) clearInterval(this.pollId);
@@ -330,4 +329,21 @@ methods: {
 .select { width: 100%; padding: .5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-alt); color: var(--text); }
 .forward-actions { display: flex; gap: .5rem; justify-content: flex-end; }
 .btn.secondary { background: var(--bg-alt); color: var(--text); border: 1px solid var(--border); }
+
+.toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-alt);
+  color: var(--accent);
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  font-weight: bold;
+  z-index: 1000;
+  opacity: 0.95;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
 </style>

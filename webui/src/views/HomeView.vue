@@ -25,8 +25,7 @@
         <div class="chat-details">
           <h3>{{ chat.displayName }}</h3>
           <p v-if="chat.lastMessage" class="last-message">
-            <span v-if="isForwarded(chat.lastMessage)" v-html="getFormattedMessage(chat.lastMessage)"></span>
-            <span v-else>{{ getFormattedMessage(chat.lastMessage) }}</span>
+            <span>{{ getFormattedMessage(chat.lastMessage) }}</span>
             <span> • {{ new Date(chat.lastMessage.timestamp).toLocaleString() }}</span>
           </p>
         </div>
@@ -85,11 +84,11 @@ export default {
       return lastSpaceIndex === -1 ? text.substring(0, length) + clamp : text.substring(0, lastSpaceIndex) + clamp;
     },
     isForwarded(message) {
-      return message.preview.includes("<strong>Forwarded from");
+      return message.preview && message.preview.startsWith("Forwarded from");
     },
     getFormattedMessage(message) {
       if (this.isForwarded(message)) {
-        return message.preview;
+        return `Forwarded: ${this.truncateText(message.preview)}`;
       }
       return this.truncateText(message.preview);
     },
@@ -98,6 +97,7 @@ export default {
     },
     logOut() {
       localStorage.clear();
+      try { delete this.$axios.defaults.headers.common['Authorization'] } catch (e) {}
       this.$router.push({ path: '/login' });
     },
     newGroup() {
@@ -238,7 +238,6 @@ export default {
   background: var(--bg-alt);
 }
 </style>
-
 
 
 

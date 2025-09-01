@@ -20,4 +20,11 @@ const router = createRouter({
 	]
 })
 
+// Minimal global auth guard: protect all routes except /login
+router.beforeEach((to, _from, next) => {
+  const token = localStorage.getItem('token');
+  if (!token && to.path !== '/login') return next('/login');
+  next();
+});
+
 export default router

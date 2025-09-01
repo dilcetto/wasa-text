@@ -59,17 +59,10 @@ export default {
       this.users = [];
       this.conversations = [];
       try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          this.$router.push('/login');
-          return;
-        }
         const params = new URLSearchParams();
         if (this.qUser.trim()) params.set('user', this.qUser.trim());
         if (this.qConv.trim()) params.set('conversation', this.qConv.trim());
-        const res = await this.$axios.get(`/searchby?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await this.$axios.get(`/searchby?${params.toString()}`);
         this.users = res.data?.users || [];
         this.conversations = res.data?.conversations || [];
       } catch (e) {
@@ -103,4 +96,3 @@ export default {
 .label { color: var(--text); }
 .muted { color: var(--text-dim); }
 </style>
-

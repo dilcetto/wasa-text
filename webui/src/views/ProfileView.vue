@@ -93,18 +93,14 @@ export default {
         },
         logOut() {
             localStorage.clear();
+            try { delete this.$axios.defaults.headers.common['Authorization'] } catch (e) {}
             this.$router.push('/login');
         },
  
         async updateUsername() {
             if (!this.newUsername || this.newUsername === this.username) return;
             try {
-              const token = localStorage.getItem('token');
-              await axios.put('/user/username', { username: this.newUsername }, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+              await axios.put('/user/username', { username: this.newUsername });
                 alert('Username updated successfully!');
                 this.username = this.newUsername;
                 localStorage.setItem('username', this.username);
@@ -139,12 +135,7 @@ export default {
         async updatePhoto() {
             if (!this.newPhoto) return
             try {
-                const token = localStorage.getItem('token');
-                await axios.put('/user/photo', { photo: this.newPhoto }, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                    },
-                });
+                await axios.put('/user/photo', { photo: this.newPhoto });
                 this.user.photo = this.newPhoto
                 localStorage.setItem('userPhoto', this.user.photo)
                 this.newPhoto = null
@@ -156,11 +147,6 @@ export default {
         },
     },
     mounted() {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            this.$router.push('/login');
-            return;
-        }
         this.initFromLocal();
     },
 }
