@@ -65,7 +65,7 @@ export default {
   data() {
     return {
       groupName: "",
-      groupPhoto: null,
+      groupPhoto: "",
       userSearch: "",
       searchResults: [],
       members: [],
@@ -80,7 +80,18 @@ export default {
   },
   methods: {
     handlePhoto(e) {
-      this.groupPhoto = e.target.files[0];
+      const file = e?.target?.files?.[0];
+      if (!file) { this.groupPhoto = ""; return; }
+      if (!file.type.startsWith('image/')) { this.errormsg = 'Please select an image file'; return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result || '';
+        // Store base64 only (no data URL prefix)
+        const b64 = typeof result === 'string' && result.includes(',') ? result.split(',')[1] : result;
+        this.groupPhoto = b64;
+      };
+      reader.onerror = () => { this.errormsg = 'Failed to read file'; };
+      reader.readAsDataURL(file);
     },
     async searchUsers() {
       if (!this.userSearch.trim()) {
@@ -89,10 +100,10 @@ export default {
       }
       try {
         const token = localStorage.getItem('token');
-        const res = await this.$axios.get(`/users/search?username=${encodeURIComponent(this.userSearch)}`, {
+        const res = await this.$axios.get(`/searchby?user=${encodeURIComponent(this.userSearch)}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        this.searchResults = res.data || [];
+        this.searchResults = res.data?.users || [];
       } catch (e) {
         this.errormsg = "Failed to search users";
       }
@@ -110,17 +121,20 @@ export default {
       this.success = false;
       try {
         const token = localStorage.getItem('token');
-        const formData = new FormData();
-        formData.append('name', this.groupName);
-        if (this.groupPhoto) formData.append('photo', this.groupPhoto);
-        formData.append('members', JSON.stringify(this.members.map(m => m.id)));
-        await this.$axios.post('/groups', formData, {
+        const payload = {
+          groupName: this.groupName,
+          members: this.members.map(m => m.id),
+          groupPhoto: this.groupPhoto || undefined,
+        };
+        const res = await this.$axios.post('/groups', payload, {
           headers: { Authorization: `Bearer ${token}` }
         });
         this.success = true;
         this.groupName = "";
-        this.groupPhoto = null;
+        this.groupPhoto = "";
         this.members = [];
+        const convId = res?.data?.conversationId;
+        if (convId) this.$router.push(`/conversations/${convId}`);
       } catch (e) {
         this.errormsg = "Failed to create group";
       }

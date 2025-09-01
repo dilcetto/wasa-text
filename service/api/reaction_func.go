@@ -39,7 +39,6 @@ func (rt *_router) commentMessage(w http.ResponseWriter, r *http.Request, ps htt
 		MessageId: messageID,
 		UserId:    userID,
 		Emoji:     req.Emoji,
-		Username:  req.Username,
 	}
 
 	err = rt.db.AddReactionToMessage(reaction)
@@ -77,14 +76,7 @@ func (rt *_router) uncommentMessage(w http.ResponseWriter, r *http.Request, ps h
 		return
 	}
 
-	reaction := &schema.Reaction{
-		MessageId: messageID,
-		UserId:    userID,
-		Emoji:     req.Emoji,
-		Username:  req.Username,
-	}
-
-	err = rt.db.DeleteReactionFromMessage(reaction.MessageId, reaction.UserId)
+	err = rt.db.DeleteReactionFromMessage(messageID, userID)
 	if err != nil {
 		ctx.Logger.WithError(err).Error("Failed to remove comment")
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

@@ -8,27 +8,29 @@ import (
 	"github.com/dilcetto/wasa/service/components/schema"
 )
 
-func (db *appdbimpl) GetGroupByID(groupID string) (*schema.Group, error) {
-	query := `SELECT id, name, photo, created_at FROM groups WHERE id = ?`
-	row := db.c.QueryRow(query, groupID)
+// unifying "groups" on conversations with type = 'group'.
+// methods operate on conversations/conversation_members instead of separate groups tables.
 
-	var group schema.Group
-	if err := row.Scan(&group.ID, &group.GroupName, &group.GroupPhoto, &group.CreatedAt); err != nil {
+func (db *appdbimpl) GetGroupByID(groupID string) (*schema.Group, error) {
+	// fetch conversation as a group
+	var g schema.Group
+	err := db.c.QueryRow(`SELECT id, name, conversationPhoto, created_at FROM conversations WHERE id = ? AND type = 'group'`, groupID).
+		Scan(&g.ID, &g.GroupName, &g.GroupPhoto, &g.CreatedAt)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("group with ID %s not found", groupID)
 		}
 		return nil, fmt.Errorf("error retrieving group: %w", err)
 	}
-
-	return &group, nil
+	return &g, nil
 }
 
 func (db *appdbimpl) GetMyGroups(userID string) ([]*schema.Group, error) {
-	query := `SELECT g.id, g.name, g.photo, g.created_at 
-			  FROM groups g 
-			  JOIN group_members gm ON g.id = gm.group_id 
-			  WHERE gm.user_id = ?`
-	rows, err := db.c.Query(query, userID)
+	rows, err := db.c.Query(`
+        SELECT c.id, c.name, c.conversationPhoto, c.created_at
+        FROM conversations c
+        JOIN conversation_members cm ON cm.conversationId = c.id
+        WHERE cm.userId = ? AND c.type = 'group'`, userID)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving groups for user %s: %w", userID, err)
 	}
@@ -36,75 +38,67 @@ func (db *appdbimpl) GetMyGroups(userID string) ([]*schema.Group, error) {
 
 	var groups []*schema.Group
 	for rows.Next() {
-		var group schema.Group
-		if err := rows.Scan(&group.ID, &group.GroupName, &group.GroupPhoto, &group.CreatedAt); err != nil {
+		var g schema.Group
+		if err := rows.Scan(&g.ID, &g.GroupName, &g.GroupPhoto, &g.CreatedAt); err != nil {
 			return nil, fmt.Errorf("error scanning group row: %w", err)
 		}
-		groups = append(groups, &group)
+		groups = append(groups, &g)
 	}
-
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating over groups: %w", err)
 	}
-
 	return groups, nil
 }
 
 func (db *appdbimpl) CreateGroup(group *schema.Group) error {
-	query := `INSERT INTO groups (id, name, photo, created_at) VALUES (?, ?, ?, ?)`
-	_, err := db.c.Exec(query, group.ID, group.GroupName, group.GroupPhoto, group.CreatedAt)
-	if err != nil {
-		return fmt.Errorf("error creating group: %w", err)
+	// mapping schema.Group to schema.Conversation and reuse CreateConversation
+	conv := &schema.Conversation{
+		ConversationID: group.ID,
+		DisplayName:    group.GroupName,
+		Type:           "group",
+		CreatedAt:      group.CreatedAt,
+		Members:        group.Members,
 	}
-
-	return nil
+	// store photo if present
+	conv.ProfilePhoto = group.GroupPhoto
+	return db.CreateConversation(conv)
 }
 
 func (db *appdbimpl) UpdateGroupName(groupID, newName string) error {
-	query := `UPDATE groups SET name = ? WHERE id = ?`
-	_, err := db.c.Exec(query, newName, groupID)
+	_, err := db.c.Exec(`UPDATE conversations SET name = ? WHERE id = ? AND type = 'group'`, newName, groupID)
 	if err != nil {
 		return fmt.Errorf("error updating group name: %w", err)
 	}
-
 	return nil
 }
 
 func (db *appdbimpl) UpdateGroupPhoto(groupID string, photo []byte) error {
-	query := `UPDATE groups SET photo = ? WHERE id = ?`
-	_, err := db.c.Exec(query, photo, groupID)
+	_, err := db.c.Exec(`UPDATE conversations SET conversationPhoto = ? WHERE id = ? AND type = 'group'`, photo, groupID)
 	if err != nil {
 		return fmt.Errorf("error updating group photo: %w", err)
 	}
-
 	return nil
 }
 
 func (db *appdbimpl) AddUserToGroup(groupID, userID string) error {
-	query := `INSERT INTO group_members (group_id, user_id) VALUES (?, ?)`
-	_, err := db.c.Exec(query, groupID, userID)
+	_, err := db.c.Exec(`INSERT INTO conversation_members (conversationId, userId) VALUES (?, ?)`, groupID, userID)
 	if err != nil {
 		return fmt.Errorf("error adding user %s to group %s: %w", userID, groupID, err)
 	}
-
 	return nil
 }
 
 func (db *appdbimpl) LeaveGroup(groupID, userID string) error {
-	query := `DELETE FROM group_members WHERE group_id = ? AND user_id = ?`
-	result, err := db.c.Exec(query, groupID, userID)
+	result, err := db.c.Exec(`DELETE FROM conversation_members WHERE conversationId = ? AND userId = ?`, groupID, userID)
 	if err != nil {
 		return fmt.Errorf("error leaving group %s: %w", groupID, err)
 	}
-
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("error checking rows affected: %w", err)
 	}
-
 	if rowsAffected == 0 {
 		return fmt.Errorf("user %s is not a member of group %s", userID, groupID)
 	}
-
 	return nil
 }

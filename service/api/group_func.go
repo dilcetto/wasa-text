@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 
 	"github.com/dilcetto/wasa/service/api/reqcontext"
@@ -13,38 +12,42 @@ import (
 )
 
 func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	err := r.ParseMultipartForm(10 << 20)
-	if err != nil {
-		http.Error(w, "Failed to parse form data", http.StatusBadRequest)
+	// require authentication and include creator among members
+	userID, authErr := rt.getAuthenticatedUserID(r)
+	if authErr != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	groupName := r.FormValue("group_name")
-	membersStr := r.FormValue("members")
-
-	var members []string
-	if err := json.Unmarshal([]byte(membersStr), &members); err != nil {
-		http.Error(w, "Invalid members format", http.StatusBadRequest)
+	var body struct {
+		GroupName  string   `json:"groupName"`
+		Members    []string `json:"members"`
+		GroupPhoto []byte   `json:"groupPhoto"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
 		return
 	}
+	groupName := body.GroupName
+	members := body.Members
+	photo := body.GroupPhoto
 
+	// validate basic input
 	if groupName == "" || len(members) == 0 {
 		http.Error(w, "Group name and members are required", http.StatusBadRequest)
 		return
 	}
 
-	file, _, err := r.FormFile("image")
-	if err != nil {
-		http.Error(w, "No image file provided", http.StatusBadRequest)
-		return
+	// ensure creator is included
+	foundCreator := false
+	for _, m := range members {
+		if m == userID {
+			foundCreator = true
+			break
+		}
 	}
-	defer file.Close()
-
-	photo, err := io.ReadAll(file)
-	if err != nil {
-		ctx.Logger.WithError(err).Error("Failed to read image file")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
+	if !foundCreator {
+		members = append(members, userID)
 	}
 
 	groupID, err := generateNewID()
@@ -70,9 +73,16 @@ func (rt *_router) createGroup(w http.ResponseWriter, r *http.Request, ps httpro
 		return
 	}
 
+	// return the created conversation as response
+	conv, err := rt.db.GetConversationByID(userID, groupID)
+	if err != nil {
+		ctx.Logger.WithError(err).Error("Group created but failed to load conversation")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(group); err != nil {
+	if err := json.NewEncoder(w).Encode(conv); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to encode group response")
 	}
 }
@@ -90,8 +100,15 @@ func (rt *_router) addToGroup(w http.ResponseWriter, r *http.Request, ps httprou
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+	// map username to user ID
+	u, err := rt.db.GetUserByName(req.Username)
+	if err != nil {
+		ctx.Logger.WithError(err).Error("User not found for addToGroup")
+		http.Error(w, "User not found", http.StatusNotFound)
+		return
+	}
 
-	if err := rt.db.AddUserToGroup(groupID, req.Username); err != nil {
+	if err := rt.db.AddUserToGroup(groupID, u.ID); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to add user to group")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
@@ -102,8 +119,7 @@ func (rt *_router) addToGroup(w http.ResponseWriter, r *http.Request, ps httprou
 
 func (rt *_router) leaveGroup(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	groupID := ps.ByName("groupId")
-	_, err := rt.getAuthenticatedUserID(r)
-	if err != nil {
+	if _, err := rt.getAuthenticatedUserID(r); err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -129,13 +145,15 @@ func (rt *_router) setGroupName(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 	groupID := ps.ByName("groupId")
-	_, err := rt.getAuthenticatedUserID(r)
+	userID, err := rt.getAuthenticatedUserID(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	var req requests.SetGroupNameRequest
+	var req struct {
+		NewName string `json:"newName"`
+	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -154,8 +172,16 @@ func (rt *_router) setGroupName(w http.ResponseWriter, r *http.Request, ps httpr
 		return
 	}
 
+	// return updated conversation
+	conv, err := rt.db.GetConversationByID(userID, groupID)
+	if err != nil {
+		ctx.Logger.WithError(err).Error("Group name updated but failed to load conversation")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(conv)
 }
 
 func (rt *_router) setGroupPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
@@ -170,23 +196,16 @@ func (rt *_router) setGroupPhoto(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	err = r.ParseMultipartForm(10 * 1024 * 1024)
-	if err != nil {
-		http.Error(w, "Failed to parse form. Ensure the file is below 10 MB.", http.StatusBadRequest)
+	var body struct {
+		GroupPhoto []byte `json:"groupPhoto"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "Invalid JSON body", http.StatusBadRequest)
 		return
 	}
-
-	file, _, err := r.FormFile("photo")
-	if err != nil {
-		http.Error(w, "Invalid photo", http.StatusBadRequest)
-		return
-	}
-	defer file.Close()
-
-	photo, err := io.ReadAll(file)
-	if err != nil {
-		ctx.Logger.WithError(err).Error("Failed to read image file")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	photo := body.GroupPhoto
+	if len(photo) == 0 {
+		http.Error(w, "Missing group photo", http.StatusBadRequest)
 		return
 	}
 
@@ -206,8 +225,12 @@ func (rt *_router) setGroupPhoto(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	response := map[string]string{
-		"message": "Photo updated successfully",
+	response := struct {
+		Message    string `json:"message"`
+		GroupPhoto []byte `json:"groupPhoto"`
+	}{
+		Message:    "Photo updated successfully",
+		GroupPhoto: photo,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

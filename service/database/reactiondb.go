@@ -6,7 +6,6 @@ import (
 	"github.com/dilcetto/wasa/service/components/schema"
 )
 
-// AddReaction adds a reaction to a message.
 func (db *appdbimpl) AddReactionToMessage(reaction *schema.Reaction) error {
 	if reaction == nil {
 		return fmt.Errorf("reaction is nil")
@@ -15,7 +14,7 @@ func (db *appdbimpl) AddReactionToMessage(reaction *schema.Reaction) error {
 		return fmt.Errorf("invalid reaction input")
 	}
 
-	query := `INSERT INTO reactions (messageId, userId, emoji) VALUES (?, ?, ?)`
+	query := `INSERT INTO reactions (messageId, userId, reaction) VALUES (?, ?, ?)`
 	_, err := db.c.Exec(query, reaction.MessageId, reaction.UserId, reaction.Emoji)
 	if err != nil {
 		return fmt.Errorf("failed to add reaction: %w", err)

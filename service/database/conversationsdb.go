@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dilcetto/wasa/service/components/schema"
+	"github.com/gofrs/uuid"
 )
 
 func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, error) {
@@ -39,7 +40,7 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, 
 				WHERE cm.conversationId = ? AND cm.userId != ?
 			`, conv.ConversationID, userID).Scan(&conv.DisplayName, &conv.ProfilePhoto)
 			if err != nil {
-				return nil, fmt.Errorf("failed to get direct conversation info: %w", err)
+				return nil, fmt.Errorf("failed to get private conversation info: %w", err)
 			}
 		} else {
 			// For group conversations, set the profile photo to the group photo
@@ -85,7 +86,7 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 		SELECT c.id, c.name, c.type, c.created_at, c.conversationPhoto
 		FROM conversations c
 		JOIN conversation_members cm ON cm.conversationId = c.id
-		WHERE cm.conversationId = ? AND cm.userId = ?`
+		WHERE c.id = ? AND cm.userId = ?`
 
 	var conv schema.Conversation
 	var convPhoto []byte
@@ -107,7 +108,7 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 			WHERE cm.conversationId = ? AND cm.userId != ?
 		`, conv.ConversationID, userID).Scan(&conv.DisplayName, &conv.ProfilePhoto)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get direct conversation info: %w", err)
+			return nil, fmt.Errorf("failed to get private conversation info: %w", err)
 		}
 	} else {
 		// For group conversations, set the profile photo to the group photo
@@ -169,7 +170,7 @@ func (db *appdbimpl) SearchConversationByName(name string) ([]schema.Conversatio
 
 // CreateConversation inserts a new conversation into the database.
 // This method is kept explicitly to be reused by other internal logic
-// (e.g., auto-creating direct conversations during SendMessage) or
+// (e.g., auto-creating private conversations during SendMessage) or
 // for explicit group chat creation if needed in the future.
 func (db *appdbimpl) CreateConversation(conversation *schema.Conversation) error {
 	query := `
@@ -199,24 +200,55 @@ func (db *appdbimpl) GetLastMessageByConversationID(conversationID string) (*sch
 		ORDER BY timestamp DESC LIMIT 1`
 
 	var msg schema.Message
+	var content string
+	var senderID string
 	var attachment []byte
-	err := db.c.QueryRow(query, conversationID).Scan(&msg.ID, &msg.Content.Value, &msg.Timestamp, &msg.SenderID, &attachment)
+	err := db.c.QueryRow(query, conversationID).Scan(&msg.ID, &content, &msg.Timestamp, &senderID, &attachment)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("no messages found for conversation %s", conversationID)
 		}
 		return nil, fmt.Errorf("failed to get last message: %w", err)
 	}
-
+	msg.SenderID = senderID
+	msg.Content = schema.MessageContent{ContentType: schema.TextContent, Value: []byte(content)}
 	if len(attachment) > 0 {
 		msg.Attachments = []string{string(attachment)}
-		msg.Content.ContentType = schema.Image
-		msg.MessageType = string(schema.Image)
-	} else {
-		msg.Content.ContentType = schema.TextContent
-		msg.MessageType = string(schema.TextContent)
 	}
-	msg.Sender.ID = msg.SenderID
-
 	return &msg, nil
+}
+
+// EnsureDirectConversation returns an existing direct conversation between userID and other user,
+// or creates a new one if none exists.
+func (db *appdbimpl) EnsureDirectConversation(userID, peerUserID string) (*schema.Conversation, error) {
+	// find existing direct conversation between the two users
+	var conversationID string
+	err := db.c.QueryRow(`
+        SELECT c.id
+        FROM conversations c
+        JOIN conversation_members cm1 ON cm1.conversationId = c.id AND cm1.userId = ?
+        JOIN conversation_members cm2 ON cm2.conversationId = c.id AND cm2.userId = ?
+        WHERE c.type = 'direct'
+        LIMIT 1
+    `, userID, peerUserID).Scan(&conversationID)
+	if err == nil {
+		// return the full conversation
+		return db.GetConversationByID(userID, conversationID)
+	}
+
+	// create a new direct conversation
+	convID, cerr := uuid.NewV4()
+	if cerr != nil {
+		return nil, fmt.Errorf("failed generating conversation id: %w", cerr)
+	}
+	// other user's username
+	_, cerr = db.c.Exec(`INSERT INTO conversations (id, name, type, created_at, conversationPhoto) VALUES (?, ?, 'direct', datetime('now'), NULL)`, convID.String(), "direct")
+	if cerr != nil {
+		return nil, fmt.Errorf("failed to create conversation: %w", cerr)
+	}
+	// Add members
+	if _, cerr = db.c.Exec(`INSERT INTO conversation_members (conversationId, userId) VALUES (?, ?), (?, ?)`, convID.String(), userID, convID.String(), peerUserID); cerr != nil {
+		return nil, fmt.Errorf("failed to add members to conversation: %w", cerr)
+	}
+	return db.GetConversationByID(userID, convID.String())
 }

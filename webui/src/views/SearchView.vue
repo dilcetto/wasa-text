@@ -19,6 +19,7 @@
         <div v-for="u in users" :key="u.id" class="row">
           <div class="avatar" v-if="u.photo"><img :src="'data:image/png;base64,' + u.photo" alt="" /></div>
           <div class="label">@{{ u.username }}</div>
+          <button class="btn" @click="startChat(u.id)">Start Chat</button>
         </div>
       </div>
       <div class="col">
@@ -75,6 +76,18 @@ export default {
     openConv(id) {
       if (!id) return;
       this.$router.push(`/conversations/${id}`);
+    },
+    async startChat(userId) {
+      if (!userId) return;
+      this.error = null;
+      try {
+        const res = await this.$axios.post('/conversations/direct', { peerUserId: userId });
+        const id = res?.data?.conversationId;
+        if (id) this.$router.push(`/conversations/${id}`);
+      } catch (e) {
+        console.error('Failed to start chat', e);
+        this.error = 'Failed to start chat';
+      }
     },
   },
 };

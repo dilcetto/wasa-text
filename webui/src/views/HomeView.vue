@@ -25,7 +25,7 @@
         <div class="chat-details">
           <h3>{{ chat.displayName }}</h3>
           <p v-if="chat.lastMessage" class="last-message">
-            <span>{{ getFormattedMessage(chat.lastMessage) }}</span>
+            <span>{{ getFormattedPreview(chat.lastMessage) }}</span>
             <span> • {{ new Date(chat.lastMessage.timestamp).toLocaleString() }}</span>
           </p>
         </div>
@@ -83,22 +83,9 @@ export default {
       const lastSpaceIndex = text.substring(0, length).lastIndexOf(' ');
       return lastSpaceIndex === -1 ? text.substring(0, length) + clamp : text.substring(0, lastSpaceIndex) + clamp;
     },
-    isForwarded(message) {
-      return message.preview && message.preview.startsWith("Forwarded from");
-    },
-    getFormattedMessage(message) {
-      if (this.isForwarded(message)) {
-        return `Forwarded: ${this.truncateText(message.preview)}`;
-      }
-      return this.truncateText(message.preview);
-    },
-    refresh() {
-      this.loadConversations();
-    },
-    logOut() {
-      localStorage.clear();
-      try { delete this.$axios.defaults.headers.common['Authorization'] } catch (e) {}
-      this.$router.push({ path: '/login' });
+    getFormattedPreview(lastMessage) {
+      const text = lastMessage?.preview || '';
+      return this.truncateText(text);
     },
     newGroup() {
       this.$router.push({ path: '/new-group' });
@@ -117,8 +104,8 @@ export default {
       const query = this.searchQuery.toLowerCase();
       return this.conversations.filter(
         (chat) =>
-          chat.displayName.toLowerCase().includes(query) ||
-          (chat.lastMessage && chat.lastMessage.preview.toLowerCase().includes(query))
+          chat.displayName?.toLowerCase().includes(query) ||
+          (chat.lastMessage && (chat.lastMessage.preview || '').toLowerCase().includes(query))
       );
     },
   },
@@ -238,6 +225,5 @@ export default {
   background: var(--bg-alt);
 }
 </style>
-
 
 

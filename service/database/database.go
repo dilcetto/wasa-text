@@ -55,7 +55,8 @@ type AppDatabase interface {
 	GetConversationByID(userID, conversationID string) (*schema.Conversation, error)
 	SearchConversationByName(name string) ([]schema.Conversation, error)
 	CreateConversation(conversation *schema.Conversation) error
-	GetLastMessageByConversationID(conversationID string) (*schema.Message, error)
+    GetLastMessageByConversationID(conversationID string) (*schema.Message, error)
+    EnsureDirectConversation(userID, peerUserID string) (*schema.Conversation, error)
 
 	//message related
 	SendMessage(message *schema.Message) error

@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/dilcetto/wasa/service/components/schema"
 )
@@ -11,12 +12,12 @@ func (db *appdbimpl) SendMessage(message *schema.Message) error {
 		return fmt.Errorf("message cannot be nil")
 	}
 
-	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	var attachment []byte
 	if len(message.Attachments) > 0 {
 		attachment = []byte(message.Attachments[0])
 	}
-	_, err := db.c.Exec(query, message.ID, message.ConversationID, message.SenderID, message.Content.Value, message.Timestamp, attachment, message.MessageStatus, message.ForwardedFrom)
+	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := db.c.Exec(query, message.ID, message.ConversationID, message.SenderID, string(message.Content.Value), message.Timestamp, attachment, message.MessageStatus, message.ForwardedFrom)
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
@@ -29,15 +30,15 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 	}
 
 	query := `
-	SELECT 
-	  m.id, m.conversationId, m.senderId, m.content, m.timestamp, 
-	  m.attachment, m.status, m.forwardedFrom,
-	  u.username, u.photo
-	FROM messages m
-	JOIN users u ON m.senderId = u.id
-	WHERE m.conversationId = ?
-	ORDER BY m.timestamp ASC`
-    rows, err := db.c.Query(query, conversationID)
+    SELECT 
+      m.id, m.conversationId, m.senderId, m.content, m.timestamp, 
+      m.attachment, m.status, m.forwardedFrom,
+      u.username, u.photo
+    FROM messages m
+    JOIN users u ON m.senderId = u.id
+    WHERE m.conversationId = ?
+    ORDER BY m.timestamp ASC`
+	rows, err := db.c.Query(query, conversationID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get messages: %w", err)
 	}
@@ -48,24 +49,28 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 	var senderPhoto []byte
 	for rows.Next() {
 		var msg schema.Message
+		var content string
 		var attachment []byte
-		// Scan row into msg and senderName, senderPhoto
-        if err := rows.Scan(
-            &msg.ID, &msg.ConversationID, &msg.SenderID, &msg.Content.Value, &msg.Timestamp,
-            &attachment, &msg.MessageStatus, &msg.ForwardedFrom,
-            &senderName, &senderPhoto,
-        ); err != nil {
-            return nil, fmt.Errorf("failed to scan message: %w", err)
-        }
+		// Scan row into vars and then populate msg
+		if err := rows.Scan(
+			&msg.ID, &msg.ConversationID, &msg.SenderID, &content, &msg.Timestamp,
+			&attachment, &msg.MessageStatus, &msg.ForwardedFrom,
+			&senderName, &senderPhoto,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan message: %w", err)
+		}
+		// Content
 		if len(attachment) > 0 {
-			msg.Attachments = []string{string(attachment)}
 			msg.Content.ContentType = schema.Image
 			msg.MessageType = string(schema.Image)
+			msg.Attachments = []string{string(attachment)}
+			msg.Content.Value = []byte{}
 		} else {
 			msg.Content.ContentType = schema.TextContent
 			msg.MessageType = string(schema.TextContent)
+			msg.Content.Value = []byte(content)
 		}
-
+		// Sender
 		msg.Sender.ID = msg.SenderID
 		msg.Sender.Username = senderName
 		msg.Sender.Photo = senderPhoto
@@ -76,12 +81,37 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 		return nil, fmt.Errorf("error reading messages: %w", err)
 	}
 
+	// Load reactions in batch
+	if len(messages) > 0 {
+		idx := make(map[string]*schema.Message, len(messages))
+		placeholders := make([]string, 0, len(messages))
+		args := make([]interface{}, 0, len(messages))
+		for _, m := range messages {
+			idx[m.ID] = m
+			placeholders = append(placeholders, "?")
+			args = append(args, m.ID)
+		}
+		q := "SELECT r.messageId, r.userId, r.reaction, u.username FROM reactions r JOIN users u ON u.id = r.userId WHERE r.messageId IN (" + strings.Join(placeholders, ",") + ")"
+		rr, err := db.c.Query(q, args...)
+		if err == nil {
+			defer rr.Close()
+			for rr.Next() {
+				var mid, uid, emoji, uname string
+				if err := rr.Scan(&mid, &uid, &emoji, &uname); err == nil {
+					if m := idx[mid]; m != nil {
+						m.Reaction = append(m.Reaction, schema.Reaction{MessageId: mid, UserId: uid, Emoji: emoji, Username: uname})
+					}
+				}
+			}
+		}
+	}
+
 	return messages, nil
 }
 
 func (db *appdbimpl) GetMessageByID(messageID string) (*schema.Message, error) {
 	query := `SELECT id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom 
-			  FROM messages WHERE id = ?`
+                  FROM messages WHERE id = ?`
 
 	row := db.c.QueryRow(query, messageID)
 
@@ -93,9 +123,10 @@ func (db *appdbimpl) GetMessageByID(messageID string) (*schema.Message, error) {
 	}
 
 	if len(attachment) > 0 {
-		message.Attachments = []string{string(attachment)} // Or a proper file path/identifier
+		message.Attachments = []string{string(attachment)}
 		message.Content.ContentType = schema.Image
 		message.MessageType = string(schema.Image)
+		message.Content.Value = []byte{}
 	} else {
 		message.Content.ContentType = schema.TextContent
 		message.MessageType = string(schema.TextContent)
@@ -107,6 +138,18 @@ func (db *appdbimpl) GetMessageByID(messageID string) (*schema.Message, error) {
 		Photo:    message.Sender.Photo,
 	}
 
+	// load reactions for this message
+	rr, rerr := db.c.Query(`SELECT r.userId, r.reaction, u.username FROM reactions r JOIN users u ON u.id = r.userId WHERE r.messageId = ?`, messageID)
+	if rerr == nil {
+		defer rr.Close()
+		for rr.Next() {
+			var uid, emoji, uname string
+			if err := rr.Scan(&uid, &emoji, &uname); err == nil {
+				message.Reaction = append(message.Reaction, schema.Reaction{MessageId: messageID, UserId: uid, Emoji: emoji, Username: uname})
+			}
+		}
+	}
+
 	return &message, nil
 }
 
@@ -115,7 +158,7 @@ func (db *appdbimpl) ForwardMessage(message *schema.Message, userID string) erro
 		return fmt.Errorf("message, user ID, and forwardedFrom cannot be empty")
 	}
 
-	// Optionally fetch original content if message.Content is empty
+	// optionally fetch original content if message.Content is empty
 	if len(message.Content.Value) == 0 && message.ForwardedFrom != "" {
 		var originalContent string
 		query := `SELECT content FROM messages WHERE id = ?`
@@ -130,12 +173,12 @@ func (db *appdbimpl) ForwardMessage(message *schema.Message, userID string) erro
 
 	}
 
-	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	var attachment []byte
 	if len(message.Attachments) > 0 {
 		attachment = []byte(message.Attachments[0])
 	}
-	_, err := db.c.Exec(query, message.ID, message.ConversationID, userID, message.Content.Value, message.Timestamp, attachment, message.MessageStatus, message.ForwardedFrom)
+	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	_, err := db.c.Exec(query, message.ID, message.ConversationID, userID, string(message.Content.Value), message.Timestamp, attachment, message.MessageStatus, message.ForwardedFrom)
 	if err != nil {
 		return fmt.Errorf("failed to forward message: %w", err)
 	}

@@ -462,8 +462,10 @@ paths:
     post:
       tags:
         - Group 
-      summary: Create a group
-      description: Allows a user to create a new group conversation with specified members.
+      summary: Create a group conversation
+      description: |
+        Creates a new conversation with type = "group" and adds the specified members (including the creator).
+        The returned object is a Conversation; the `conversationId` acts as the group id.
       operationId: createGroup
       security:
         - BearerAuth: []
@@ -473,14 +475,30 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Group'
+              type: object
+              required: [groupName, members]
+              properties:
+                groupName:
+                  type: string
+                  description: Name of the group
+                  minLength: 3
+                  maxLength: 50
+                members:
+                  type: array
+                  description: Array of user IDs to include
+                  items:
+                    type: string
+                groupPhoto:
+                  type: string
+                  format: byte
+                  description: Optional base64-encoded image data
       responses:
           '201':
-            description: Group created successfuly
+            description: Group conversation created successfully
             content:
               application/json:
                 schema:
-                  $ref: '#/components/schemas/Group'
+                  $ref: '#/components/schemas/Conversation'
           '400':
             description: Failed to create group
             content:
@@ -493,7 +511,7 @@ paths:
       tags:
         - Group
       summary: Add a user to a group
-      description: Allows an existing group member to add a user to the group.
+      description: Allows an existing group member to add a user to the group. Here `groupId` equals the `conversationId`.
       operationId: addToGroup
       security:
         - BearerAuth: []
@@ -512,11 +530,11 @@ paths:
         content:
           application/json:
             schema:
-              allOf:
-              - $ref: '#/components/schemas/Username'
-              - type: object
-              required:
-                - username
+              type: object
+              required: [username]
+              properties:
+                username:
+                  $ref: '#/components/schemas/Username'
       responses:
         '204':
           description: User successfully added to the group
@@ -531,7 +549,7 @@ paths:
       tags:
         - Group
       summary: User leaves a group
-      description: Allows a user to leave a specific group conversation.
+      description: Allows a user to leave a specific group conversation. Here `groupId` equals the `conversationId`.
       operationId: leaveGroup
       security:
         - BearerAuth: []
@@ -560,7 +578,7 @@ paths:
       tags:
         - Group 
       summary: Update a group name
-      description: Updates the name of a specified group conversation.
+      description: Updates the name of a specified group conversation (conversation type = group).
       operationId: setGroupName
       security:
         - BearerAuth: []
@@ -579,18 +597,19 @@ paths:
         content:
           application/json:
             schema:
-              allOf:
-              - $ref: '#/components/schemas/Group'
-              - type: object
-              required:
-                - groupName
+              type: object
+              required: [newName]
+              properties:
+                newName:
+                  type: string
+                  minLength: 1
       responses:
         '200':
           description: Group name successfully updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Group'
+                $ref: '#/components/schemas/Conversation'
         '400':
           description: Failed to update group name
           content:
@@ -603,7 +622,7 @@ paths:
       tags:
         - Group 
       summary: Update group photo
-      description: Updates the photo of a specified group conversation.
+      description: Updates the photo of a specified group conversation (conversation type = group).
       operationId: setGroupPhoto
       security:
         - BearerAuth: []
@@ -617,11 +636,12 @@ paths:
             minLength: 1
             maxLength: 36
       requestBody:
+        required: true
         content:
           application/json:
             schema:
               type: object
-              description: Object that contains photo
+              required: [groupPhoto]
               properties:
                 groupPhoto:
                   type: string
@@ -713,7 +733,7 @@ components:
         type:
           type: string
           enum: [direct, group]
-          description: Indicates whether the conversation is a direct chat or a group conversation.
+          description: Indicates whether the conversation is a private chat or a group conversation.
         createdAt:
           type: string
           format: date-time
@@ -858,6 +878,31 @@ components:
       properties:
         error:
           type: string
-          description: Error details about why the request failed 
-
-
+          description: Error details about why the request failed
+  /conversations/direct:
+    post:
+      tags:
+        - Conversation
+      summary: Ensure a direct conversation with a peer
+      description: Creates or returns an existing direct conversation between the authenticated user and the specified peer user.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [peerUserId]
+              properties:
+                peerUserId:
+                  type: string
+      responses:
+        '201':
+          description: Direct conversation ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          description: Invalid input

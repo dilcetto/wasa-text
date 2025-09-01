@@ -12,10 +12,11 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.GET("/searchby", rt.wrap(rt.search_by))
 	rt.router.PUT("/user/username", rt.wrap(rt.setMyUserName))
 	rt.router.PUT("/user/photo", rt.wrap(rt.setMyPhoto))
-	// conversation and messages routes
-	rt.router.GET("/conversations", rt.wrap(rt.getMyConversations))
-	rt.router.GET("/conversations/:conversationId", rt.wrap(rt.getConversation))
-	rt.router.POST("/conversations/:conversationId/messages", rt.wrap(rt.sendMessage))
+    // conversation and messages routes
+    rt.router.GET("/conversations", rt.wrap(rt.getMyConversations))
+    rt.router.GET("/conversations/:conversationId", rt.wrap(rt.getConversation))
+    rt.router.POST("/conversations/direct", rt.wrap(rt.createDirectConversation))
+    rt.router.POST("/conversations/:conversationId/messages", rt.wrap(rt.sendMessage))
 	rt.router.POST("/conversations/:conversationId/messages/:messageId/forward", rt.wrap(rt.forwardMessage))
 	rt.router.DELETE("/conversations/:conversationId/messages/:messageId", rt.wrap(rt.deleteMessage))
 	rt.router.POST("/conversations/:conversationId/messages/:messageId/status", rt.wrap(rt.setMessageStatus))

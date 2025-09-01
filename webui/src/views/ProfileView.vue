@@ -89,7 +89,7 @@ export default {
           this.user.photo = photo;
         },
         startChat() {
-            this.$router.push('/home'); //fix up later /chat
+            this.$router.push('/search');
         },
         logOut() {
             localStorage.clear();
@@ -135,7 +135,9 @@ export default {
         async updatePhoto() {
             if (!this.newPhoto) return
             try {
-                await axios.put('/user/photo', { photo: this.newPhoto });
+                // send base64 payload only (no data URL prefix)
+                const b64 = (this.newPhoto.includes(',') ? this.newPhoto.split(',')[1] : this.newPhoto) || '';
+                await axios.put('/user/photo', { photo: b64 });
                 this.user.photo = this.newPhoto
                 localStorage.setItem('userPhoto', this.user.photo)
                 this.newPhoto = null

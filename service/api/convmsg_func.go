@@ -8,7 +8,6 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/dilcetto/wasa/service/api/reqcontext"
-	"github.com/dilcetto/wasa/service/components/requests"
 	"github.com/dilcetto/wasa/service/components/schema"
 	"github.com/julienschmidt/httprouter"
 )
@@ -78,6 +77,32 @@ func (rt *_router) getConversation(w http.ResponseWriter, r *http.Request, ps ht
 	}
 }
 
+// createDirectConversation ensures a direct conversation exists between the authenticated user and the specified peer
+// and returns the conversation.
+func (rt *_router) createDirectConversation(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
+    userID, err := rt.getAuthenticatedUserID(r)
+    if err != nil {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+    var body struct {
+        PeerUserID string `json:"peerUserId"`
+    }
+    if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.PeerUserID == "" {
+        http.Error(w, "Invalid request body", http.StatusBadRequest)
+        return
+    }
+    conv, err := rt.db.EnsureDirectConversation(userID, body.PeerUserID)
+    if err != nil {
+        ctx.Logger.WithError(err).Error("Failed to ensure direct conversation")
+        http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusCreated)
+    _ = json.NewEncoder(w).Encode(conv)
+}
+
 func (rt *_router) sendMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
 	conversationID := ps.ByName("conversationId")
 	if conversationID == "" {
@@ -126,8 +151,10 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
 		return
 	}
 
-	var req requests.ForwardMessageRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	var body struct {
+		TargetConversationId string `json:"targetConversationId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to decode forward message request")
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
@@ -156,11 +183,17 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
 	}
 
 	// Create the forwarded message
+	targetConv := body.TargetConversationId
+	if targetConv == "" {
+		http.Error(w, "Missing target conversation id", http.StatusBadRequest)
+		return
+	}
+
 	forwardedMessage := schema.Message{
 		ID:             newMessageID,
 		SenderID:       userID,
 		Sender:         originalMessage.Sender,
-		ConversationID: req.TargetConversationID,
+		ConversationID: targetConv,
 		MessageType:    originalMessage.MessageType,
 		Content:        originalMessage.Content,
 		Timestamp:      time.Now().Format(time.RFC3339),

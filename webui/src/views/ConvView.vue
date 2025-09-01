@@ -10,6 +10,9 @@
             {{ conversation.membersIds.length }} member(s)
           </div>
         </div>
+        <div v-if="conversation.type === 'group'" class="actions">
+          <router-link :to="`/groups/${conversationId}/edit`" class="link">Edit Group</router-link>
+        </div>
       </div>
     </header>
 
@@ -44,6 +47,12 @@
             <div class="actions">
               <button class="link" @click="openForward(m.id)">Forward</button>
               <button v-if="isOwn(m)" class="link danger" @click="del(m.id)">Delete</button>
+              <span class="sep">|</span>
+              <span class="muted">React:</span>
+              <button class="link" @click="react(m.id, '👍')">👍</button>
+              <button class="link" @click="react(m.id, '❤️')">❤️</button>
+              <button class="link" @click="react(m.id, '😂')">😂</button>
+              <button class="link" @click="unreact(m.id)">Remove</button>
             </div>
           </div>
         </div>
@@ -58,6 +67,7 @@
           @keyup.enter="send"
           ref="messageInput"
         />
+        <input type="file" accept="image/*" @change="attachPhoto" />
         <button class="btn" :disabled="!canSend || sending" @click="send">{{ sending ? 'Sending…' : 'Send' }}</button>
       </footer>
 
@@ -90,6 +100,7 @@ export default {
             forwarding: false,
             errorMessage: null,
             newMessage: '',
+            photoAttachB64: '',
             toast: { show: false, msg: "" },
             conversation: {
                 id: null,
@@ -148,14 +159,23 @@ methods: {
         this.sending = true;
         this.errorMessage = null;
         try {
-            const messagePayload = {
+            let messagePayload = {};
+            if (this.photoAttachB64) {
+              messagePayload = {
+                content: { type: 'image', value: '' },
+                attachments: [ this.photoAttachB64 ],
+              };
+            } else {
+              messagePayload = {
                 content: {
                     type: 'text',
                     value: this.toBase64(this.newMessage)
                 },
-            };
+              };
+            }
             await this.$axios.post(`/conversations/${this.conversationId}/messages`, messagePayload);
             this.newMessage = '';
+            this.photoAttachB64 = '';
             this.showToast("Message sent.");
             await this.load();
         } catch (error) {
@@ -167,6 +187,36 @@ methods: {
         this.$nextTick(() => {
           this.$refs.messageInput?.focus();
         });
+    },
+    attachPhoto(e) {
+      const file = e?.target?.files?.[0];
+      if (!file) { this.photoAttachB64 = ''; return; }
+      if (!file.type.startsWith('image/')) { this.errorMessage = 'Please select an image'; return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result || '';
+        this.photoAttachB64 = typeof result === 'string' && result.includes(',') ? result.split(',')[1] : result;
+      };
+      reader.onerror = () => { this.errorMessage = 'Failed to read file'; };
+      reader.readAsDataURL(file);
+    },
+    async react(messageId, emoji) {
+      try {
+        await this.$axios.post(`/conversations/${this.conversationId}/messages/${messageId}/comment`, { emoji });
+        this.showToast('Reacted');
+      } catch (e) {
+        console.error('Failed reaction', e);
+        this.errorMessage = 'Failed to react';
+      }
+    },
+    async unreact(messageId) {
+      try {
+        await this.$axios.delete(`/conversations/${this.conversationId}/messages/${messageId}/comment`, { data: {} });
+        this.showToast('Removed reaction');
+      } catch (e) {
+        console.error('Failed to remove reaction', e);
+        this.errorMessage = 'Failed to remove reaction';
+      }
     },
    async del(messageId) {
     if (!messageId) return;
