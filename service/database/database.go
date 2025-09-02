@@ -57,6 +57,7 @@ type AppDatabase interface {
 	CreateConversation(conversation *schema.Conversation) error
     GetLastMessageByConversationID(conversationID string) (*schema.Message, error)
     EnsureDirectConversation(userID, peerUserID string) (*schema.Conversation, error)
+    GetConversationMembers(conversationID string) ([]schema.User, error)
 
 	//message related
 	SendMessage(message *schema.Message) error

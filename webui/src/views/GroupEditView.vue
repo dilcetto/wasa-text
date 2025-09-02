@@ -8,6 +8,16 @@
       <ErrorMsg v-if="errormsg" :msg="errormsg" />
 
       <div class="field">
+        <label>Members</label>
+        <ul class="members">
+          <li v-for="m in members" :key="m.id">
+            <span class="pill">@{{ m.username }}</span>
+            <span v-if="m.id === currentUserId" class="you">(you)</span>
+          </li>
+        </ul>
+      </div>
+
+      <div class="field">
         <label>Current Name</label>
         <div class="dim">{{ group.displayName || '—' }}</div>
       </div>
@@ -61,6 +71,7 @@ export default {
   data() {
     return {
       group: {},
+      members: [],
       newName: '',
       newPhoto: '',
       memberUsername: '',
@@ -75,6 +86,10 @@ export default {
     groupId() {
       return this.$route.params.groupId;
     },
+    currentUserId() {
+      return localStorage.getItem('userId') || '';
+    },
+    // members fetched separately
     currentPhoto() {
       const b64 = this.group?.profilePhoto || '';
       return b64 ? 'data:image/png;base64,' + b64 : '';
@@ -92,10 +107,19 @@ export default {
     async load() {
       this.errormsg = null;
       try {
-        const res = await this.$axios.get(`/conversations/${this.groupId}`);
+        const res = await this.$axios.get(`/conversation/${this.groupId}`);
         this.group = res.data || {};
+        await this.loadMembers();
       } catch (e) {
         this.errormsg = 'Failed to load group';
+      }
+    },
+    async loadMembers() {
+      try {
+        const res = await this.$axios.get(`/conversations/${this.groupId}/members`);
+        this.members = res.data || [];
+      } catch (e) {
+        // non-blocking
       }
     },
     async updateName() {
@@ -304,6 +328,10 @@ label { font-weight: 600; }
   box-shadow: 0 0 10px rgba(22,163,74,.25);
   font-weight: 600;
 }
+
+.members { list-style: none; padding-left: 0; display: flex; gap: .5rem; flex-wrap: wrap; }
+.pill { background: var(--bg-hover); border: 1px solid var(--border); border-radius: 999px; padding: .2rem .6rem; }
+.you { color: var(--text-dim); margin-left: .25rem; }
 
 
 @media (max-width: 640px) {

@@ -14,7 +14,8 @@ func (rt *_router) Handler() http.Handler {
 	rt.router.PUT("/user/photo", rt.wrap(rt.setMyPhoto))
     // conversation and messages routes
     rt.router.GET("/conversations", rt.wrap(rt.getMyConversations))
-    rt.router.GET("/conversations/:conversationId", rt.wrap(rt.getConversation))
+    rt.router.GET("/conversation/:conversationId", rt.wrap(rt.getConversation))
+    rt.router.GET("/conversations/:conversationId/members", rt.wrap(rt.getConversationMembers))
     rt.router.POST("/conversations/direct", rt.wrap(rt.createDirectConversation))
     rt.router.POST("/conversations/:conversationId/messages", rt.wrap(rt.sendMessage))
 	rt.router.POST("/conversations/:conversationId/messages/:messageId/forward", rt.wrap(rt.forwardMessage))

@@ -80,27 +80,56 @@ func (rt *_router) getConversation(w http.ResponseWriter, r *http.Request, ps ht
 // createDirectConversation ensures a direct conversation exists between the authenticated user and the specified peer
 // and returns the conversation.
 func (rt *_router) createDirectConversation(w http.ResponseWriter, r *http.Request, _ httprouter.Params, ctx reqcontext.RequestContext) {
-    userID, err := rt.getAuthenticatedUserID(r)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
-    var body struct {
-        PeerUserID string `json:"peerUserId"`
-    }
-    if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.PeerUserID == "" {
-        http.Error(w, "Invalid request body", http.StatusBadRequest)
-        return
-    }
-    conv, err := rt.db.EnsureDirectConversation(userID, body.PeerUserID)
-    if err != nil {
-        ctx.Logger.WithError(err).Error("Failed to ensure direct conversation")
-        http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-        return
-    }
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusCreated)
-    _ = json.NewEncoder(w).Encode(conv)
+	userID, err := rt.getAuthenticatedUserID(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var body struct {
+		PeerUserID string `json:"peerUserId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.PeerUserID == "" {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	conv, err := rt.db.EnsureDirectConversation(userID, body.PeerUserID)
+	if err != nil {
+		ctx.Logger.WithError(err).Error("Failed to ensure direct conversation")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(conv)
+}
+
+func (rt *_router) getConversationMembers(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
+	conversationID := ps.ByName("conversationId")
+	if conversationID == "" {
+		http.Error(w, "Missing conversation ID", http.StatusBadRequest)
+		return
+	}
+
+	userID, err := rt.getAuthenticatedUserID(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if _, err := rt.db.GetConversationByID(userID, conversationID); err != nil {
+		http.Error(w, "Conversation not found", http.StatusNotFound)
+		return
+	}
+
+	members, err := rt.db.GetConversationMembers(conversationID)
+	if err != nil {
+		ctx.Logger.WithError(err).Error("Failed to get conversation members")
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(members)
 }
 
 func (rt *_router) sendMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {

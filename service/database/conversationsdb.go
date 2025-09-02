@@ -218,6 +218,33 @@ func (db *appdbimpl) GetLastMessageByConversationID(conversationID string) (*sch
 	return &msg, nil
 }
 
+// return the list of users in the conversation.
+func (db *appdbimpl) GetConversationMembers(conversationID string) ([]schema.User, error) {
+	rows, err := db.c.Query(`
+        SELECT u.id, u.username, u.photo
+        FROM users u
+        JOIN conversation_members cm ON cm.userId = u.id
+        WHERE cm.conversationId = ?
+    `, conversationID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query conversation members: %w", err)
+	}
+	defer rows.Close()
+
+	var users []schema.User
+	for rows.Next() {
+		var u schema.User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Photo); err != nil {
+			return nil, fmt.Errorf("failed to scan conversation member: %w", err)
+		}
+		users = append(users, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over conversation members: %w", err)
+	}
+	return users, nil
+}
+
 // EnsureDirectConversation returns an existing direct conversation between userID and other user,
 // or creates a new one if none exists.
 func (db *appdbimpl) EnsureDirectConversation(userID, peerUserID string) (*schema.Conversation, error) {

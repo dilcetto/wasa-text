@@ -131,7 +131,7 @@ methods: {
     async load() {
         this.errorMessage = null;
         try {
-            const response = await this.$axios.get(`/conversations/${this.conversationId}`);
+            const response = await this.$axios.get(`/conversation/${this.conversationId}`);
             // backend return message.content as base64
             this.conversation = response.data || {};
             this.$nextTick(this.scrollToBottom);
