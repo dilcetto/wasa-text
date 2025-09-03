@@ -54,6 +54,6 @@ func (rt *_router) doLogin(w http.ResponseWriter, r *http.Request, ps httprouter
     }
 
     response := schema.LoginResponse{User: *user, Token: tokenString}
-    w.WriteHeader(http.StatusOK)
+    w.WriteHeader(http.StatusCreated)
     _ = json.NewEncoder(w).Encode(response)
 }

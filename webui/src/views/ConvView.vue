@@ -196,7 +196,7 @@ methods: {
     async load() {
         this.errorMessage = null;
         try {
-            const response = await this.$axios.get(`/conversation/${this.conversationId}`);
+            const response = await this.$axios.get(`/conversations/${this.conversationId}`);
             // backend return message.content as base64
             this.conversation = response.data || {};
             this.$nextTick(this.scrollToBottom);
@@ -239,7 +239,7 @@ methods: {
               };
             }
             const token = localStorage.getItem('token');
-            await this.$axios.post(`/conversation/${this.conversationId}/messages`, messagePayload, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+            await this.$axios.post(`/conversations/${this.conversationId}/messages`, messagePayload, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
             this.newMessage = '';
             this.photoAttachB64 = '';
             this.showToast("Message sent.");
@@ -271,7 +271,7 @@ methods: {
       this.$set ? this.$set(this.reactBusy, messageId, true) : (this.reactBusy[messageId] = true);
       try {
         const token = localStorage.getItem('token');
-        const url = `/conversation/${this.conversationId}/messages/${messageId}/comment`;
+        const url = `/conversations/${this.conversationId}/messages/${messageId}/comment`;
         if (this.$axios && this.$axios.post) {
           await this.$axios.post(
             url,
@@ -312,7 +312,7 @@ methods: {
       this.$set ? this.$set(this.reactBusy, messageId, true) : (this.reactBusy[messageId] = true);
       try {
         const token = localStorage.getItem('token');
-        const url = `/conversation/${this.conversationId}/messages/${messageId}/comment`;
+        const url = `/conversations/${this.conversationId}/messages/${messageId}/comment`;
         if (this.$axios && this.$axios.delete) {
           await this.$axios.delete(
             url,
@@ -348,7 +348,7 @@ methods: {
     if (!confirm("Are you sure you want to delete this message?")) return;
     try {
         const token = localStorage.getItem('token');
-        await this.$axios.delete(`/conversation/${this.conversationId}/messages/${messageId}`,
+        await this.$axios.delete(`/conversations/${this.conversationId}/messages/${messageId}`,
           token ? { headers: { Authorization: `Bearer ${token}` } } : {}
         );
         this.showToast("Message deleted.");
@@ -372,7 +372,7 @@ methods: {
         try {
             const token = localStorage.getItem('token');
             await this.$axios.post(
-              `/conversation/${this.conversationId}/messages/${this.forward.messageId}/forward`,
+              `/conversations/${this.conversationId}/messages/${this.forward.messageId}/forward`,
               { targetConversationId: this.forward.target },
               token ? { headers: { Authorization: `Bearer ${token}` } } : {}
             );

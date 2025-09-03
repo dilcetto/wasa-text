@@ -33,7 +33,7 @@ func (rt *_router) getMyConversations(w http.ResponseWriter, r *http.Request, _ 
 }
 
 func (rt *_router) getConversation(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	conversationID := ps.ByName("conversationId")
+    conversationID := ps.ByName("conversationId")
 	if conversationID == "" {
 		http.Error(w, "Missing conversation ID", http.StatusBadRequest)
 		return
@@ -102,7 +102,7 @@ func (rt *_router) createDirectConversation(w http.ResponseWriter, r *http.Reque
 }
 
 func (rt *_router) getConversationMembers(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	conversationID := ps.ByName("conversationId")
+    conversationID := ps.ByName("conversationId")
 	if conversationID == "" {
 		http.Error(w, "Missing conversation ID", http.StatusBadRequest)
 		return
@@ -131,7 +131,7 @@ func (rt *_router) getConversationMembers(w http.ResponseWriter, r *http.Request
 }
 
 func (rt *_router) sendMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	conversationID := ps.ByName("conversationId")
+    conversationID := ps.ByName("conversationId")
 	if conversationID == "" {
 		http.Error(w, "Missing conversation ID", http.StatusBadRequest)
 		return
@@ -162,13 +162,20 @@ func (rt *_router) sendMessage(w http.ResponseWriter, r *http.Request, ps httpro
 	message.Timestamp = time.Now().Format(time.RFC3339)
 	message.MessageStatus = "sent"
 
-	if err := rt.db.SendMessage(&message); err != nil {
-		ctx.Logger.WithError(err).Error("Failed to send message")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
+    if err := rt.db.SendMessage(&message); err != nil {
+        ctx.Logger.WithError(err).Error("Failed to send message")
+        http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+        return
+    }
+    // Return 201 + created message body for better client UX / OpenAPI alignment
+    stored, gerr := rt.db.GetMessageByID(messageID)
+    if gerr != nil {
+        w.WriteHeader(http.StatusCreated)
+        return
+    }
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusCreated)
+    _ = json.NewEncoder(w).Encode(stored)
 }
 
 func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
@@ -240,8 +247,8 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
 }
 
 func (rt *_router) deleteMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	conversationID := ps.ByName("conversationId")
-	messageID := ps.ByName("messageId")
+    conversationID := ps.ByName("conversationId")
+    messageID := ps.ByName("messageId")
 	userID, err := rt.getAuthenticatedUserID(r)
 	if err != nil {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -260,17 +267,17 @@ func (rt *_router) deleteMessage(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	ctx.Logger.WithFields(logrus.Fields{
-		"conversation_id": conversationID,
-		"message_id":      messageID,
-		"user_id":         userID,
-	}).Info("Message deleted successfully")
+    w.WriteHeader(http.StatusNoContent)
+    ctx.Logger.WithFields(logrus.Fields{
+        "conversation_id": conversationID,
+        "message_id":      messageID,
+        "user_id":         userID,
+    }).Info("Message deleted successfully")
 }
 
 func (rt *_router) setMessageStatus(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {
-	conversationID := ps.ByName("conversationId")
-	messageID := ps.ByName("messageId")
+    conversationID := ps.ByName("conversationId")
+    messageID := ps.ByName("messageId")
 	if conversationID == "" || messageID == "" {
 		http.Error(w, "Missing conversation or message ID", http.StatusBadRequest)
 		return

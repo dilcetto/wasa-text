@@ -1,11 +1,12 @@
 package database
 
 import (
-	"database/sql"
-	"fmt"
+    "database/sql"
+    "errors"
+    "fmt"
 
-	"github.com/dilcetto/wasa/service/components/schema"
-	"github.com/gofrs/uuid"
+    "github.com/dilcetto/wasa/service/components/schema"
+    "github.com/gofrs/uuid"
 )
 
 func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, error) {
@@ -47,18 +48,21 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, 
 			conv.ProfilePhoto = convPhoto
 		}
 		// Fetch members
-		memberRows, err := db.c.Query(`SELECT userId FROM conversation_members WHERE conversationId = ?`, conv.ConversationID)
-		if err != nil {
-			return nil, err
-		}
-		for memberRows.Next() {
-			var memberID string
-			if err := memberRows.Scan(&memberID); err != nil {
-				return nil, err
-			}
-			conv.Members = append(conv.Members, memberID)
-		}
-		memberRows.Close()
+        memberRows, err := db.c.Query(`SELECT userId FROM conversation_members WHERE conversationId = ?`, conv.ConversationID)
+        if err != nil {
+            return nil, err
+        }
+        for memberRows.Next() {
+            var memberID string
+            if err := memberRows.Scan(&memberID); err != nil {
+                return nil, err
+            }
+            conv.Members = append(conv.Members, memberID)
+        }
+        if err := memberRows.Err(); err != nil {
+            return nil, err
+        }
+        _ = memberRows.Close()
 		// Fetch last message
 		var last schema.LastMessage
 		var senderID string
@@ -92,12 +96,12 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 	var convPhoto []byte
 
 	err := db.c.QueryRow(query, conversationID, userID).Scan(&conv.ConversationID, &conv.DisplayName, &conv.Type, &conv.CreatedAt, &convPhoto)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("conversation not found")
-		}
-		return nil, fmt.Errorf("failed to get conversation: %w", err)
-	}
+    if err != nil {
+        if errors.Is(err, sql.ErrNoRows) {
+            return nil, fmt.Errorf("conversation not found")
+        }
+        return nil, fmt.Errorf("failed to get conversation: %w", err)
+    }
 
 	if conv.Type == "direct" {
 		// Get the other user's info
@@ -111,8 +115,8 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 			return nil, fmt.Errorf("failed to get private conversation info: %w", err)
 		}
 	} else {
-		// For group conversations, set the profile photo to the group photo
-		conv.ProfilePhoto = []byte(convPhoto)
+        // For group conversations, set the profile photo to the group photo
+        conv.ProfilePhoto = convPhoto
 	}
 
 	// Fetch members
@@ -120,14 +124,18 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 	if err != nil {
 		return nil, err
 	}
-	for memberRows.Next() {
-		var memberID string
-		if err := memberRows.Scan(&memberID); err != nil {
-			return nil, err
-		}
-		conv.Members = append(conv.Members, memberID)
-	}
-	memberRows.Close()
+    for memberRows.Next() {
+        var memberID string
+        if err := memberRows.Scan(&memberID); err != nil {
+            return nil, err
+        }
+        conv.Members = append(conv.Members, memberID)
+    }
+    // check for errors during iteration and close rows
+    if err := memberRows.Err(); err != nil {
+        return nil, err
+    }
+    _ = memberRows.Close()
 
 	// Fetch last message
 	var last schema.LastMessage
@@ -204,12 +212,12 @@ func (db *appdbimpl) GetLastMessageByConversationID(conversationID string) (*sch
 	var senderID string
 	var attachment []byte
 	err := db.c.QueryRow(query, conversationID).Scan(&msg.ID, &content, &msg.Timestamp, &senderID, &attachment)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("no messages found for conversation %s", conversationID)
-		}
-		return nil, fmt.Errorf("failed to get last message: %w", err)
-	}
+    if err != nil {
+        if errors.Is(err, sql.ErrNoRows) {
+            return nil, fmt.Errorf("no messages found for conversation %s", conversationID)
+        }
+        return nil, fmt.Errorf("failed to get last message: %w", err)
+    }
 	msg.SenderID = senderID
 	msg.Content = schema.MessageContent{ContentType: schema.TextContent, Value: []byte(content)}
 	if len(attachment) > 0 {

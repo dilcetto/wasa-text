@@ -1,10 +1,10 @@
 package api
 
 import (
-	"encoding/json"
-	"errors"
-	"net/http"
-	"strings"
+    "encoding/json"
+    "errors"
+    "net/http"
+    "strings"
 
 	"github.com/dilcetto/wasa/service/api/reqcontext"
 	"github.com/dilcetto/wasa/service/components/requests"
@@ -166,5 +166,5 @@ func (rt *_router) setMyPhoto(w http.ResponseWriter, r *http.Request, ps httprou
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+    w.WriteHeader(http.StatusNoContent)
 }

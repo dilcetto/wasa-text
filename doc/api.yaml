@@ -53,6 +53,9 @@ paths:
                   token:
                     type: string
                     description: Bearer token (JWT) for authentication.
+                    pattern: ^.*?$
+                    minLength: 16
+                    maxLength: 4096
         '400':
           description: Bad request due to invalid input
           content:
@@ -67,6 +70,7 @@ paths:
         - Conversation
       summary: Search for users or conversations
       description: Searches for users or conversations based on a query string.
+      operationId: searchBy
       security:
         - BearerAuth: []
       parameters:
@@ -100,11 +104,15 @@ paths:
                     items:
                       $ref: '#/components/schemas/User'
                     description: List of usernames matching the search query.
+                    minItems: 0
+                    maxItems: 1000
                   conversations:
                     type: array
                     items:
                       $ref: '#/components/schemas/Conversation'
                     description: List of conversations matching the search query.
+                    minItems: 0
+                    maxItems: 1000
         '400':
           description: Bad request due to invalid input
           content:
@@ -200,7 +208,7 @@ paths:
                 minItems: 0
                 maxItems: 100
   
-  /conversation/{conversationId}:
+  /conversations/{conversationId}:
     get:
       tags:
         - Conversation
@@ -233,7 +241,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /conversation/{conversationId}/messages:             
+  /conversations/{conversationId}/messages:             
     post:
       tags:
         - Message
@@ -272,7 +280,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /conversation/{conversationId}/messages/{messageId}/forward:
+  /conversations/{conversationId}/messages/{messageId}/forward:
     post:
       tags:
         - Message
@@ -330,7 +338,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /conversation/{conversationId}/messages/{messageId}:
+  /conversations/{conversationId}/messages/{messageId}:
     delete:
       tags:
         - Message
@@ -368,13 +376,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /conversation/{conversationId}/messages/{messageId}/status:
+  /conversations/{conversationId}/messages/{messageId}/status:
     post:
       tags:
         - Message
       summary: Update message delivery or read status
       description: |
         Updates the delivery or read status of a message for a specific user.
+      operationId: setMessageStatus
       parameters:
         - name: conversationId
           in: path
@@ -406,14 +415,41 @@ paths:
                   enum: [delivered, read]
                   description: The status to update (must be either `delivered` or `read`).
       responses:
-        '200':
-          description: Status updated successfully
+        '204':
+          description: Status updated successfully (no content)
         '400':
           description: Invalid input (e.g., missing userId or invalid status)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
           description: Message or user not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
-  /conversation/{conversationId}/messages/{messageId}/comment:
+  /conversations/{conversationId}/messages/{messageId}/comment:
+    parameters:
+      - name: conversationId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^.*?$
+          minLength: 1
+          maxLength: 36
+        description: Unique identifier for the conversation.
+      - name: messageId
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^.*?$
+          minLength: 1
+          maxLength: 36
+        description: Unique identifier for the message.
     post:
       tags:
         - Reaction
@@ -456,6 +492,39 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /direct-conversations:
+    post:
+      tags:
+        - Conversation
+      summary: Ensure a direct conversation with a peer
+      description: Creates or returns an existing direct conversation between the authenticated user and the specified peer user.
+      operationId: createDirectConversation
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [peerUserId]
+              properties:
+                peerUserId:
+                  type: string
+                  description: Unique identifier of the target user to start a direct conversation with.
+                  pattern: ^.*?$
+                  minLength: 1
+                  maxLength: 36
+      responses:
+        '201':
+          description: Direct conversation ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          description: Invalid input
                   
 
   /groups:
@@ -481,6 +550,7 @@ paths:
                 groupName:
                   type: string
                   description: Name of the group
+                  pattern: ^.*?$
                   minLength: 3
                   maxLength: 50
                 members:
@@ -488,6 +558,8 @@ paths:
                   description: Array of user IDs to include
                   items:
                     type: string
+                  minItems: 1
+                  maxItems: 100
                 groupPhoto:
                   type: string
                   format: byte
@@ -602,7 +674,10 @@ paths:
               properties:
                 newName:
                   type: string
+                  description: The new group name to set.
+                  pattern: ^.*?$
                   minLength: 1
+                  maxLength: 50
       responses:
         '200':
           description: Group name successfully updated
@@ -662,6 +737,9 @@ paths:
                   message:
                     type: string
                     description: Confirmation message
+                    pattern: ^.*?$
+                    minLength: 1
+                    maxLength: 100
                   groupPhoto:
                     type: string
                     format: byte
@@ -715,6 +793,9 @@ components:
       type: string
       format: byte
       description: Base64-encoded image data
+      pattern: ^.*?$
+      minLength: 0
+      maxLength: 10485760
     Conversation:
       type: object
       description: Represents a user's conversation.
@@ -773,6 +854,9 @@ components:
         id:
           type: string
           description: Unique identifier for the message.
+          pattern: ^.*?$
+          minLength: 1
+          maxLength: 36
         sender:
           type: object
           description: Information about the message sender.
@@ -783,6 +867,9 @@ components:
             id:
               type: string
               description: Unique identifier of the sender.
+              pattern: ^.*?$
+              minLength: 1
+              maxLength: 36
             username:
               $ref: '#/components/schemas/Username'
         content:
@@ -810,6 +897,9 @@ components:
           type: string
           enum: ['sent', 'delivered', 'read']
           description: Status of the message.
+          pattern: ^.*?$
+          minLength: 3
+          maxLength: 9
         reaction:
           type: array
           description: Reactions to this message.
@@ -823,6 +913,8 @@ components:
           items:
             type: string
             format: byte
+          minItems: 0
+          maxItems: 10
         forwarded_from:
           type: string
           description: ID of the user this message was forwarded from.
@@ -832,6 +924,8 @@ components:
     Reaction:
       type: object
       description: A reaction to a message.
+      required:
+        - emoji
       properties:
         emoji:
           type: string
@@ -841,37 +935,6 @@ components:
           maxLength: 10
         username:
           $ref: '#/components/schemas/Username'
-    Group:
-      type: object
-      description: A group conversation.
-      required:
-        - groupId
-        - groupName
-        - members
-      properties:
-        groupId:
-          type: string
-          description: Unique identifier for the group.
-          pattern: ^.*?$
-          minLength: 1
-          maxLength: 36
-        groupName:
-          type: string
-          description: Name of the group
-          pattern: ^.*?$
-          minLength: 1
-          maxLength: 50
-        groupPhoto:
-          type: string
-          format: byte
-          description: Base64-encoded image data
-        members:
-          type: array
-          description: List of users in the group
-          items:
-            $ref: '#/components/schemas/User'
-          minItems: 3
-          maxItems: 100
     Error:
       type: object
       description: Error response
@@ -879,30 +942,7 @@ components:
         error:
           type: string
           description: Error details about why the request failed
-  /conversations/direct:
-    post:
-      tags:
-        - Conversation
-      summary: Ensure a direct conversation with a peer
-      description: Creates or returns an existing direct conversation between the authenticated user and the specified peer user.
-      security:
-        - BearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [peerUserId]
-              properties:
-                peerUserId:
-                  type: string
-      responses:
-        '201':
-          description: Direct conversation ready
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Conversation'
-        '400':
-          description: Invalid input
+          pattern: ^.*?$
+          minLength: 1
+          maxLength: 512
+  

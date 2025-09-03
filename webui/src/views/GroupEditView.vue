@@ -107,7 +107,7 @@ export default {
     async load() {
       this.errormsg = null;
       try {
-        const res = await this.$axios.get(`/conversation/${this.groupId}`);
+        const res = await this.$axios.get(`/conversations/${this.groupId}`);
         this.group = res.data || {};
         await this.loadMembers();
       } catch (e) {

@@ -92,19 +92,22 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 			args = append(args, m.ID)
 		}
 		q := "SELECT r.messageId, r.userId, r.reaction, u.username FROM reactions r JOIN users u ON u.id = r.userId WHERE r.messageId IN (" + strings.Join(placeholders, ",") + ")"
-		rr, err := db.c.Query(q, args...)
-		if err == nil {
-			defer rr.Close()
-			for rr.Next() {
-				var mid, uid, emoji, uname string
-				if err := rr.Scan(&mid, &uid, &emoji, &uname); err == nil {
-					if m := idx[mid]; m != nil {
-						m.Reaction = append(m.Reaction, schema.Reaction{MessageId: mid, UserId: uid, Emoji: emoji, Username: uname})
-					}
-				}
-			}
-		}
-	}
+        rr, err := db.c.Query(q, args...)
+        if err == nil {
+            defer rr.Close()
+            for rr.Next() {
+                var mid, uid, emoji, uname string
+                if err := rr.Scan(&mid, &uid, &emoji, &uname); err == nil {
+                    if m := idx[mid]; m != nil {
+                        m.Reaction = append(m.Reaction, schema.Reaction{MessageId: mid, UserId: uid, Emoji: emoji, Username: uname})
+                    }
+                }
+            }
+            if err := rr.Err(); err != nil {
+                // ignore reaction load errors to not fail the whole call
+            }
+        }
+    }
 
 	return messages, nil
 }

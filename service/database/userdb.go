@@ -51,21 +51,24 @@ func (db *appdbimpl) GetUserById(userID string) (*schema.User, error) {
 }
 
 func (db *appdbimpl) SearchUserByUsername(username string) ([]schema.User, error) {
-	var users []schema.User
-	rows, err := db.c.Query("SELECT id, username, photo FROM users WHERE username LIKE ?", "%"+username+"%")
-	if err != nil {
-		return nil, fmt.Errorf("failed to search users by username: %w", err)
-	}
-	defer rows.Close()
+    var users []schema.User
+    rows, err := db.c.Query("SELECT id, username, photo FROM users WHERE username LIKE ?", "%"+username+"%")
+    if err != nil {
+        return nil, fmt.Errorf("failed to search users by username: %w", err)
+    }
+    defer rows.Close()
 
-	for rows.Next() {
-		var u schema.User
-		if err := rows.Scan(&u.ID, &u.Username, &u.Photo); err != nil {
-			return nil, fmt.Errorf("failed to scan user: %w", err)
-		}
-		users = append(users, u)
-	}
-	return users, nil
+    for rows.Next() {
+        var u schema.User
+        if err := rows.Scan(&u.ID, &u.Username, &u.Photo); err != nil {
+            return nil, fmt.Errorf("failed to scan user: %w", err)
+        }
+        users = append(users, u)
+    }
+    if err := rows.Err(); err != nil {
+        return nil, fmt.Errorf("error iterating over users: %w", err)
+    }
+    return users, nil
 }
 
 func (db *appdbimpl) UpdateUsername(userId, newName string) error {

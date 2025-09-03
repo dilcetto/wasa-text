@@ -81,7 +81,7 @@ export default {
       if (!userId) return;
       this.error = null;
       try {
-        const res = await this.$axios.post('/conversations/direct', { peerUserId: userId });
+        const res = await this.$axios.post('/direct-conversations', { peerUserId: userId });
         const id = res?.data?.conversationId;
         if (id) this.$router.push(`/conversations/${id}`);
       } catch (e) {

@@ -1,0 +1,12 @@
+FROM node:lts AS builder
+
+WORKDIR /app/webui
+COPY webui/ .
+
+RUN yarn build-prod
+
+FROM nginx:stable
+
+
+COPY --from=builder /app/webui/dist /usr/share/nginx/html
+
