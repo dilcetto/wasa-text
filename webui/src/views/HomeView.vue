@@ -10,11 +10,18 @@
       />
       <div class="user-info">
         <img :src="user.photo" alt="User Photo" class="user-photo" />
-        <p>{{ user.name }}</p>
+        <RouterLink to="/profile" class="profile-link">{{ user.name }}</RouterLink>
       </div>
     </div>
     <div class="chat-list">
       <ErrorMsg v-if="errormsg" :msg="errormsg" />
+      <div v-if="!errormsg && conversations.length === 0" class="empty">
+        <p>No conversations yet.</p>
+        <div class="cta">
+          <RouterLink to="/search" class="btn">Start a Chat</RouterLink>
+          <RouterLink to="/new-group" class="btn btn-primary">Create a Group</RouterLink>
+        </div>
+      </div>
       <div
         v-for="chat in filteredChats"
         :key="chat.conversationId"
@@ -48,7 +55,7 @@ export default {
       searchQuery: '',
       user: {
         name: localStorage.getItem('username') || 'Unknown',
-        photo: '/nopfp.jpg',
+        photo: localStorage.getItem('userPhoto') || '/nopfp.jpg',
       },
       conversations: [],
       errormsg: null,
@@ -177,6 +184,12 @@ export default {
   background: var(--bg);
 }
 
+.empty { color: var(--text-dim); text-align: center; padding: 2rem 0; }
+.cta { display: flex; gap: .6rem; justify-content: center; margin-top: .5rem; }
+.btn { appearance: none; cursor: pointer; background: var(--bg-alt); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: .5rem .9rem; text-decoration: none; }
+.btn.btn-primary { background: linear-gradient(90deg, var(--accent), var(--accent-alt)); color: #0b0f17; border: 1px solid color-mix(in oklab, var(--accent) 60%, var(--accent-alt) 40%); box-shadow: 0 0 10px var(--accent), 0 0 16px var(--accent-alt); }
+
+
 .chat-preview {
   display: flex;
   align-items: center;
@@ -225,5 +238,3 @@ export default {
   background: var(--bg-alt);
 }
 </style>
-
-

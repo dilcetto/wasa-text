@@ -28,7 +28,6 @@ func (rt *_router) getMyConversations(w http.ResponseWriter, r *http.Request, _ 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(conversations); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to encode conversations")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 }
@@ -72,7 +71,6 @@ func (rt *_router) getConversation(w http.ResponseWriter, r *http.Request, ps ht
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(conversation); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to encode conversation")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 }

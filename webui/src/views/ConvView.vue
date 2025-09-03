@@ -1,19 +1,19 @@
 <template>
   <section class="conversation">
-    <header class="conv-header">
+<header class="conv-header">
       <router-link to="/home" class="back">← Back</router-link>
-      <div class="peer">
-        <img v-if="conversationPhoto" :src="conversationPhoto" class="avatar" alt="Chat" />
-        <div class="meta">
-          <h2 class="name">{{ conversation.displayName || 'Conversation' }}</h2>
-          <div class="muted" v-if="conversation.membersIds?.length">
-            {{ conversation.membersIds.length }} member(s)
-          </div>
-        </div>
-        <div v-if="conversation.type === 'group'" class="actions">
-          <router-link :to="`/groups/${conversationId}/edit`" class="link">Edit Group</router-link>
-        </div>
+  <div class="peer">
+    <img v-if="conversationPhoto" :src="conversationPhoto" class="avatar" alt="Chat" />
+    <div class="meta">
+      <h2 class="name">{{ conversation.displayName || 'Conversation' }}</h2>
+      <div class="muted" v-if="conversation.membersIds?.length">
+        {{ conversation.membersIds.length }} member(s)
       </div>
+      <div v-if="conversation.type === 'group'" class="actions">
+        <router-link :to="`/groups/${conversationId}/edit`" class="link">Edit Group</router-link>
+      </div>
+    </div>
+  </div>
     </header>
 
     <LoadingSpinner :loading="loading">
@@ -124,7 +124,8 @@ export default {
             return b64 ? 'data:image/png;base64,' + b64 : '';
         },
         canSend() {
-            return this.newMessage.trim().length > 0;
+            // Allow sending if we have text or an image attachment
+            return (this.newMessage && this.newMessage.trim().length > 0) || !!this.photoAttachB64;
         },
     },
 methods: {
@@ -173,7 +174,8 @@ methods: {
                 },
               };
             }
-            await this.$axios.post(`/conversations/${this.conversationId}/messages`, messagePayload);
+            const token = localStorage.getItem('token');
+            await this.$axios.post(`/conversation/${this.conversationId}/messages`, messagePayload, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
             this.newMessage = '';
             this.photoAttachB64 = '';
             this.showToast("Message sent.");
@@ -202,8 +204,14 @@ methods: {
     },
     async react(messageId, emoji) {
       try {
-        await this.$axios.post(`/conversations/${this.conversationId}/messages/${messageId}/comment`, { emoji });
+        const token = localStorage.getItem('token');
+        await this.$axios.post(
+          `/conversation/${this.conversationId}/messages/${messageId}/comment`,
+          { emoji },
+          token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+        );
         this.showToast('Reacted');
+        await this.load();
       } catch (e) {
         console.error('Failed reaction', e);
         this.errorMessage = 'Failed to react';
@@ -211,8 +219,13 @@ methods: {
     },
     async unreact(messageId) {
       try {
-        await this.$axios.delete(`/conversations/${this.conversationId}/messages/${messageId}/comment`, { data: {} });
+        const token = localStorage.getItem('token');
+        await this.$axios.delete(
+          `/conversation/${this.conversationId}/messages/${messageId}/comment`,
+          { data: {}, ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}) }
+        );
         this.showToast('Removed reaction');
+        await this.load();
       } catch (e) {
         console.error('Failed to remove reaction', e);
         this.errorMessage = 'Failed to remove reaction';
@@ -222,7 +235,10 @@ methods: {
     if (!messageId) return;
     if (!confirm("Are you sure you want to delete this message?")) return;
     try {
-        await this.$axios.delete(`/conversations/${this.conversationId}/messages/${messageId}`);
+        const token = localStorage.getItem('token');
+        await this.$axios.delete(`/conversation/${this.conversationId}/messages/${messageId}`,
+          token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+        );
         this.showToast("Message deleted.");
         await this.load();
       } catch (e) {
@@ -242,7 +258,12 @@ methods: {
         if (!this.forward.messageId || !this.forward.target) return;
         this.forwarding = true;
         try {
-            await this.$axios.post(`/conversations/${this.conversationId}/messages/${this.forward.messageId}/forward`, { targetConversationId: this.forward.target });
+            const token = localStorage.getItem('token');
+            await this.$axios.post(
+              `/conversation/${this.conversationId}/messages/${this.forward.messageId}/forward`,
+              { targetConversationId: this.forward.target },
+              token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+            );
             this.showToast("Message forwarded.");
             this.closeForward();
         } catch (e) {
@@ -303,8 +324,6 @@ methods: {
   height: calc(100vh - 100px);
   background: var(--bg);
   color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 12px;
 }
 .conv-header {
   display: flex;
@@ -314,9 +333,9 @@ methods: {
   border-bottom: 1px solid var(--border);
 }
 .back { text-decoration: none; color: var(--text-dim); }
-.peer { display: flex; align-items: center; gap: .75rem; }
-.avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
-.meta { display: grid; }
+.peer { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding-left: .5rem; padding-right: .5rem; }
+.avatar { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent); box-shadow: 0 0 6px var(--accent); }
+.meta { display: grid; text-align: center; }
 .name { margin: 0; font-size: 1rem; }
 .muted { color: var(--text-dim); font-size: .85rem; }
 .messages {
@@ -335,11 +354,11 @@ methods: {
   border-radius: 12px;
   background: var(--bg-alt);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  box-shadow: 0 0 10px rgba(0,0,0,.25);
 }
 .msg-row.own .bubble {
-  background: color-mix(in oklab, var(--bg-alt) 70%, var(--accent) 30%);
-  border-color: color-mix(in oklab, var(--border) 40%, var(--accent) 60%);
+  background: color-mix(in oklab, var(--bg-alt) 65%, var(--accent) 35%);
+  border-color: color-mix(in oklab, var(--border) 30%, var(--accent) 70%);
 }
 .fwd { font-size: .75rem; color: var(--text-dim); margin-bottom: .25rem; }
 .text { white-space: pre-wrap; word-break: break-word; }

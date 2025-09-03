@@ -200,7 +200,7 @@ paths:
                 minItems: 0
                 maxItems: 100
   
-  /conversations/{conversationId}:
+  /conversation/{conversationId}:
     get:
       tags:
         - Conversation
@@ -233,7 +233,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /conversations/{conversationId}/messages:             
+  /conversation/{conversationId}/messages:             
     post:
       tags:
         - Message
@@ -272,7 +272,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /conversations/{conversationId}/messages/{messageId}/forward:
+  /conversation/{conversationId}/messages/{messageId}/forward:
     post:
       tags:
         - Message
@@ -330,7 +330,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /conversations/{conversationId}/messages/{messageId}:
+  /conversation/{conversationId}/messages/{messageId}:
     delete:
       tags:
         - Message
@@ -368,7 +368,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  /conversations/{conversationId}/messages/{messageId}/status:
+  /conversation/{conversationId}/messages/{messageId}/status:
     post:
       tags:
         - Message
@@ -413,7 +413,7 @@ paths:
         '404':
           description: Message or user not found
 
-  /conversations/{conversationId}/messages/{messageId}/comment:
+  /conversation/{conversationId}/messages/{messageId}/comment:
     post:
       tags:
         - Reaction

@@ -15,15 +15,15 @@ func (rt *_router) Handler() http.Handler {
     // conversation and messages routes
     rt.router.GET("/conversations", rt.wrap(rt.getMyConversations))
     rt.router.GET("/conversation/:conversationId", rt.wrap(rt.getConversation))
-    rt.router.GET("/conversations/:conversationId/members", rt.wrap(rt.getConversationMembers))
+    rt.router.GET("/conversation/:conversationId/members", rt.wrap(rt.getConversationMembers))
     rt.router.POST("/conversations/direct", rt.wrap(rt.createDirectConversation))
-    rt.router.POST("/conversations/:conversationId/messages", rt.wrap(rt.sendMessage))
-	rt.router.POST("/conversations/:conversationId/messages/:messageId/forward", rt.wrap(rt.forwardMessage))
-	rt.router.DELETE("/conversations/:conversationId/messages/:messageId", rt.wrap(rt.deleteMessage))
-	rt.router.POST("/conversations/:conversationId/messages/:messageId/status", rt.wrap(rt.setMessageStatus))
-	//reaction routes
-	rt.router.POST("/conversations/:conversationId/messages/:messageId/comment", rt.wrap(rt.commentMessage))
-	rt.router.DELETE("/conversations/:conversationId/messages/:messageId/comment", rt.wrap(rt.uncommentMessage))
+    rt.router.POST("/conversation/:conversationId/messages", rt.wrap(rt.sendMessage))
+    rt.router.POST("/conversation/:conversationId/messages/:messageId/forward", rt.wrap(rt.forwardMessage))
+    rt.router.DELETE("/conversation/:conversationId/messages/:messageId", rt.wrap(rt.deleteMessage))
+    rt.router.POST("/conversation/:conversationId/messages/:messageId/status", rt.wrap(rt.setMessageStatus))
+    //reaction routes
+    rt.router.POST("/conversation/:conversationId/messages/:messageId/comment", rt.wrap(rt.commentMessage))
+    rt.router.DELETE("/conversation/:conversationId/messages/:messageId/comment", rt.wrap(rt.uncommentMessage))
 	//group routes
 	rt.router.POST("/groups", rt.wrap(rt.createGroup))
 	rt.router.POST("/groups/:groupId", rt.wrap(rt.addToGroup))

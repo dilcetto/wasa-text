@@ -14,8 +14,13 @@ func (db *appdbimpl) AddReactionToMessage(reaction *schema.Reaction) error {
 		return fmt.Errorf("invalid reaction input")
 	}
 
-	query := `INSERT INTO reactions (messageId, userId, reaction) VALUES (?, ?, ?)`
-	_, err := db.c.Exec(query, reaction.MessageId, reaction.UserId, reaction.Emoji)
+    // Upsert: one reaction per (messageId, userId). If it exists, update the emoji.
+    query := `
+    INSERT INTO reactions (messageId, userId, reaction)
+    VALUES (?, ?, ?)
+    ON CONFLICT(messageId, userId) DO UPDATE SET
+      reaction = excluded.reaction`
+    _, err := db.c.Exec(query, reaction.MessageId, reaction.UserId, reaction.Emoji)
 	if err != nil {
 		return fmt.Errorf("failed to add reaction: %w", err)
 	}

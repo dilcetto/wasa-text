@@ -55,6 +55,7 @@ export default {
           }
           // update axios default header so subsequent requests are authenticated
           try { this.$axios.defaults.headers.common['Authorization'] = `Bearer ${token}` } catch (e) {}
+          // token already saved; axios default header set above
           const redirect = this.$route.query.redirect || '/home';
           this.$router.push(redirect);
         } else {

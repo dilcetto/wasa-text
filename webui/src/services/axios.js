@@ -1,8 +1,8 @@
 import axios from "axios";
 
 const instance = axios.create({
-	baseURL: __API_URL__,
-	timeout: 1000 * 7
+    baseURL: __API_URL__,
+    timeout: 1000 * 7
 });
 
 // Set Authorization from localStorage at startup (single source: 'token')

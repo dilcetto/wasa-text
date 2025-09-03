@@ -12,6 +12,13 @@
   --shadow: 0 0 8px rgba(139, 92, 246, 0.4); /* purple glow */
 }
 
+/* Apply dark theme globally */
+html, body, #app {
+  background: var(--bg);
+  color: var(--text);
+  height: 100%;
+}
+
 .home-container {
   display: flex;
   height: 100vh;
