@@ -44,15 +44,50 @@
               <span class="status" v-if="m.message_status">• {{ m.message_status }}</span>
             </div>
 
+            <div class="reactions" v-if="m.reaction && m.reaction.length">
+              <span
+                v-for="g in groupReactions(m)"
+                :key="g.emoji"
+                class="rx-chip"
+                :class="{ mine: g.mine }"
+                :title="g.users.join(', ')"
+              >
+                {{ g.emoji }} {{ g.count }}
+              </span>
+            </div>
+
             <div class="actions">
-              <button class="link" @click="openForward(m.id)">Forward</button>
-              <button v-if="isOwn(m)" class="link danger" @click="del(m.id)">Delete</button>
+              <button type="button" class="link" @click.stop.prevent="openForward(m.id)">Forward</button>
+              <button v-if="isOwn(m)" type="button" class="link danger" @click.stop.prevent="del(m.id)">Delete</button>
               <span class="sep">|</span>
               <span class="muted">React:</span>
-              <button class="link" @click="react(m.id, '👍')">👍</button>
-              <button class="link" @click="react(m.id, '❤️')">❤️</button>
-              <button class="link" @click="react(m.id, '😂')">😂</button>
-              <button class="link" @click="unreact(m.id)">Remove</button>
+              <button
+                type="button"
+                class="link emoji"
+                :class="{ active: myReaction(m) === '👍', busy: !!reactBusy[m.id] }"
+                :disabled="!!reactBusy[m.id]"
+                @click.stop.prevent="react(m.id, '👍')"
+              >👍</button>
+              <button
+                type="button"
+                class="link emoji"
+                :class="{ active: myReaction(m) === '❤️', busy: !!reactBusy[m.id] }"
+                :disabled="!!reactBusy[m.id]"
+                @click.stop.prevent="react(m.id, '❤️')"
+              >❤️</button>
+              <button
+                type="button"
+                class="link emoji"
+                :class="{ active: myReaction(m) === '😂', busy: !!reactBusy[m.id] }"
+                :disabled="!!reactBusy[m.id]"
+                @click.stop.prevent="react(m.id, '😂')"
+              >😂</button>
+              <button
+                type="button"
+                class="link"
+                :disabled="!!reactBusy[m.id] || !myReaction(m)"
+                @click.stop.prevent="unreact(m.id)"
+              >Remove</button>
             </div>
           </div>
         </div>
@@ -112,7 +147,8 @@ export default {
             allConversations: [],
             forward: { open: false, messageId: null, target: '' },
             pollId: null,   
-            userId: localStorage.getItem('userId') || null
+            userId: localStorage.getItem('userId') || null,
+            reactBusy: {},
         };
     },
     computed: {
@@ -129,6 +165,34 @@ export default {
         },
     },
 methods: {
+    myReaction(message) {
+      try {
+        const uid = this.userId;
+        const arr = message?.reaction || [];
+        const mine = arr.find(r => r.user_id === uid || r.userId === uid);
+        return mine?.emoji || '';
+      } catch { return ''; }
+    },
+    groupReactions(message) {
+      try {
+        const arr = message?.reaction || [];
+        const map = new Map();
+        for (const r of arr) {
+          const emoji = r?.emoji || '';
+          const uid = r?.user_id || r?.userId || '';
+          const uname = r?.username || '';
+          if (!emoji) continue;
+          if (!map.has(emoji)) map.set(emoji, { emoji, users: [], count: 0, mine: false });
+          const g = map.get(emoji);
+          g.users.push(uname || uid);
+          g.count += 1;
+          if (uid === this.userId) g.mine = true;
+        }
+        return Array.from(map.values());
+      } catch {
+        return [];
+      }
+    },
     async load() {
         this.errorMessage = null;
         try {
@@ -203,32 +267,80 @@ methods: {
       reader.readAsDataURL(file);
     },
     async react(messageId, emoji) {
+      if (this.reactBusy[messageId]) return;
+      this.$set ? this.$set(this.reactBusy, messageId, true) : (this.reactBusy[messageId] = true);
       try {
         const token = localStorage.getItem('token');
-        await this.$axios.post(
-          `/conversation/${this.conversationId}/messages/${messageId}/comment`,
-          { emoji },
-          token ? { headers: { Authorization: `Bearer ${token}` } } : {}
-        );
+        const url = `/conversation/${this.conversationId}/messages/${messageId}/comment`;
+        if (this.$axios && this.$axios.post) {
+          await this.$axios.post(
+            url,
+            { emoji },
+            token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+          );
+        } else {
+          // Fallback to fetch if axios instance is not available in this context
+          const res = await fetch((typeof __API_URL__ !== 'undefined' ? __API_URL__ : '') + url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ emoji }),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        }
+        // Optimistically update UI
+        const uname = localStorage.getItem('username') || '';
+        const msg = (this.conversation?.messages || []).find(m => m.id === messageId);
+        if (msg) {
+          msg.reaction = (msg.reaction || []).filter(r => (r.user_id || r.userId) !== this.userId);
+          msg.reaction.push({ message_id: messageId, user_id: this.userId, emoji, username: uname });
+        }
         this.showToast('Reacted');
-        await this.load();
+        // background refresh
+        this.load();
       } catch (e) {
         console.error('Failed reaction', e);
         this.errorMessage = 'Failed to react';
+      } finally {
+        this.reactBusy[messageId] = false;
       }
     },
     async unreact(messageId) {
+      if (this.reactBusy[messageId]) return;
+      this.$set ? this.$set(this.reactBusy, messageId, true) : (this.reactBusy[messageId] = true);
       try {
         const token = localStorage.getItem('token');
-        await this.$axios.delete(
-          `/conversation/${this.conversationId}/messages/${messageId}/comment`,
-          { data: {}, ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}) }
-        );
+        const url = `/conversation/${this.conversationId}/messages/${messageId}/comment`;
+        if (this.$axios && this.$axios.delete) {
+          await this.$axios.delete(
+            url,
+            { data: {}, ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}) }
+          );
+        } else {
+          const res = await fetch((typeof __API_URL__ !== 'undefined' ? __API_URL__ : '') + url, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({}),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        }
+        // Optimistically update UI
+        const msg = (this.conversation?.messages || []).find(m => m.id === messageId);
+        if (msg && Array.isArray(msg.reaction)) {
+          msg.reaction = msg.reaction.filter(r => (r.user_id || r.userId) !== this.userId);
+        }
         this.showToast('Removed reaction');
-        await this.load();
+        this.load();
       } catch (e) {
         console.error('Failed to remove reaction', e);
         this.errorMessage = 'Failed to remove reaction';
+      } finally {
+        this.reactBusy[messageId] = false;
       }
     },
    async del(messageId) {
@@ -345,6 +457,8 @@ methods: {
   flex-direction: column;
   gap: .5rem;
   background: var(--bg);
+  position: relative;
+  z-index: 1;
 }
 .msg-row { display: flex; }
 .msg-row.own { justify-content: flex-end; }
@@ -355,6 +469,8 @@ methods: {
   background: var(--bg-alt);
   border: 1px solid var(--border);
   box-shadow: 0 0 10px rgba(0,0,0,.25);
+  position: relative;
+  z-index: 2;
 }
 .msg-row.own .bubble {
   background: color-mix(in oklab, var(--bg-alt) 65%, var(--accent) 35%);
@@ -367,6 +483,16 @@ methods: {
 .actions { margin-top: .35rem; display: flex; gap: .5rem; }
 .link { background: transparent; border: none; color: var(--accent); cursor: pointer; padding: 0; }
 .link.danger { color: #ef4444; }
+/* ensure buttons are clickable above any overlay */
+.actions, .actions * { pointer-events: auto; }
+
+/* emoji visual feedback */
+.emoji { transition: transform .12s ease, opacity .12s ease, color .12s ease; }
+.emoji.active { transform: scale(1.1); color: var(--accent-alt); text-shadow: 0 0 8px var(--accent-alt); }
+.emoji.busy { opacity: .6; pointer-events: none; }
+.reactions { margin-top: .25rem; display: flex; gap: .35rem; flex-wrap: wrap; }
+.rx-chip { font-size: .85rem; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: .1rem .4rem; color: var(--text-dim); }
+.rx-chip.mine { border-color: var(--accent-alt); color: var(--accent-alt); box-shadow: 0 0 6px var(--accent-alt); }
 .composer {
   display: flex;
   gap: .5rem;
