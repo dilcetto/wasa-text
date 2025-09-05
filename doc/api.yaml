@@ -849,7 +849,7 @@ components:
         - timestamp
         - message_status
         - reaction
-        - attachment
+        - attachments
       properties:
         id:
           type: string

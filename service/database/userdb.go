@@ -9,6 +9,7 @@ import (
 )
 
 var ErrUserDoesNotExist = errors.New("user does not exist")
+var ErrUsernameTaken = errors.New("username already exists")
 
 func (db *appdbimpl) CreateUser(u *schema.User) error {
 	// Check if user with the same name already exists
@@ -72,10 +73,19 @@ func (db *appdbimpl) SearchUserByUsername(username string) ([]schema.User, error
 }
 
 func (db *appdbimpl) UpdateUsername(userId, newName string) error {
-	res, err := db.c.Exec(`UPDATE users SET username=? WHERE id=?`, newName, userId)
-	if err != nil {
-		return err
-	}
+    // check for username collision before updating
+    var exists bool
+    if err := db.c.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE username = ? AND id <> ?)`, newName, userId).Scan(&exists); err != nil {
+        return err
+    }
+    if exists {
+        return ErrUsernameTaken
+    }
+
+    res, err := db.c.Exec(`UPDATE users SET username=? WHERE id=?`, newName, userId)
+    if err != nil {
+        return err
+    }
 	affected, err := res.RowsAffected()
 	if err != nil {
 		return err

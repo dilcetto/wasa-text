@@ -120,16 +120,25 @@ func (rt *_router) setMyUserName(w http.ResponseWriter, r *http.Request, ps http
 		return
 	}
 
-	dbErr := rt.db.UpdateUsername(userID, req.Username)
-	if errors.Is(dbErr, database.ErrUserDoesNotExist) {
-		http.Error(w, "User not found", http.StatusNotFound)
-		return
-	} else if dbErr != nil {
-		ctx.Logger.WithError(dbErr).Error("failed to update username")
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+    dbErr := rt.db.UpdateUsername(userID, req.Username)
+    if errors.Is(dbErr, database.ErrUserDoesNotExist) {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusNotFound)
+        _ = json.NewEncoder(w).Encode(map[string]string{"error": "User not found"})
+        return
+    } else if errors.Is(dbErr, database.ErrUsernameTaken) {
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusConflict)
+        _ = json.NewEncoder(w).Encode(map[string]string{"error": "Username already exists"})
+        return
+    } else if dbErr != nil {
+        ctx.Logger.WithError(dbErr).Error("failed to update username")
+        w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(http.StatusInternalServerError)
+        _ = json.NewEncoder(w).Encode(map[string]string{"error": "Failed to update username"})
+        return
+    }
+    w.WriteHeader(http.StatusNoContent)
 }
 
 func (rt *_router) setMyPhoto(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {

@@ -30,11 +30,8 @@
           <div class="bubble">
             <div v-if="m.forwarded_from" class="fwd">Forwarded</div>
 
-            <div v-if="m.content?.type === 'text'" class="text" v-text="decodeText(m.content?.value)"></div>
-            <div v-else-if="m.content?.type === 'image'" class="image">
-              <img :src="'data:image/png;base64,' + (m.content?.value || '')" alt="image" />
-            </div>
-            <div v-else-if="m.attachments?.length" class="attachment">
+            <div v-if="decodeText(m.content?.value)" class="text" v-text="decodeText(m.content?.value)"></div>
+            <div v-if="m.attachments?.length" class="attachment">
               <img :src="'data:image/png;base64,' + m.attachments[0]" alt="attachment" />
             </div>
 
@@ -225,19 +222,13 @@ methods: {
         this.errorMessage = null;
         try {
             let messagePayload = {};
-            if (this.photoAttachB64) {
-              messagePayload = {
-                content: { type: 'image', value: '' },
-                attachments: [ this.photoAttachB64 ],
-              };
-            } else {
-              messagePayload = {
-                content: {
-                    type: 'text',
-                    value: this.toBase64(this.newMessage)
-                },
-              };
-            }
+            messagePayload = {
+              content: {
+                type: 'text',
+                value: this.newMessage ? this.toBase64(this.newMessage) : ''
+              },
+              ...(this.photoAttachB64 ? { attachments: [ this.photoAttachB64 ] } : {})
+            };
             const token = localStorage.getItem('token');
             await this.$axios.post(`/conversations/${this.conversationId}/messages`, messagePayload, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
             this.newMessage = '';

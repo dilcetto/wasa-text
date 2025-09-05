@@ -40,45 +40,45 @@ import (
 
 // AppDatabase is the high level interface for the DB
 type AppDatabase interface {
-	Ping() error
+    Ping() error
 
-	//user related
-	SearchUserByUsername(username string) ([]schema.User, error)
-	GetUserByName(username string) (*schema.User, error)
-	GetUserById(id string) (*schema.User, error)
-	CreateUser(user *schema.User) error
-	UpdateUsername(userID, newUsername string) error
-	UpdateUserPhoto(userID string, photo []byte) error
+    // user related
+    SearchUserByUsername(username string) ([]schema.User, error)
+    GetUserByName(username string) (*schema.User, error)
+    GetUserById(id string) (*schema.User, error)
+    CreateUser(user *schema.User) error
+    UpdateUsername(userID, newUsername string) error
+    UpdateUserPhoto(userID string, photo []byte) error
 
-	//conversation related
-	GetMyConversations(userID string) ([]*schema.Conversation, error)
-	GetConversationByID(userID, conversationID string) (*schema.Conversation, error)
-	SearchConversationByName(name string) ([]schema.Conversation, error)
-	CreateConversation(conversation *schema.Conversation) error
+    // conversation related
+    GetMyConversations(userID string) ([]*schema.Conversation, error)
+    GetConversationByID(userID, conversationID string) (*schema.Conversation, error)
+    SearchConversationByName(name string) ([]schema.Conversation, error)
+    CreateConversation(conversation *schema.Conversation) error
     GetLastMessageByConversationID(conversationID string) (*schema.Message, error)
     EnsureDirectConversation(userID, peerUserID string) (*schema.Conversation, error)
     GetConversationMembers(conversationID string) ([]schema.User, error)
 
-	//message related
-	SendMessage(message *schema.Message) error
-	GetMessagesByConversationID(conversationID string) ([]*schema.Message, error)
-	GetMessageByID(messageID string) (*schema.Message, error)
-	ForwardMessage(message *schema.Message, userID string) error
-	DeleteMessage(conversationID, messageID, userID string) error
-	MarkMessageStatus(messageID, userID, status string) error
+    // message related
+    SendMessage(message *schema.Message) error
+    GetMessagesByConversationID(conversationID string) ([]*schema.Message, error)
+    GetMessageByID(messageID string) (*schema.Message, error)
+    ForwardMessage(message *schema.Message, userID string) error
+    DeleteMessage(conversationID, messageID, userID string) error
+    MarkMessageStatus(messageID, userID, status string) error
 
-	//group related
-	GetGroupByID(groupID string) (*schema.Group, error)
-	GetMyGroups(userID string) ([]*schema.Group, error)
-	CreateGroup(group *schema.Group) error
-	UpdateGroupName(groupID, newName string) error
-	UpdateGroupPhoto(groupID string, photo []byte) error
-	AddUserToGroup(groupID, userID string) error
-	LeaveGroup(groupID, userID string) error
+    // group related
+    GetGroupByID(groupID string) (*schema.Group, error)
+    GetMyGroups(userID string) ([]*schema.Group, error)
+    CreateGroup(group *schema.Group) error
+    UpdateGroupName(groupID, newName string) error
+    UpdateGroupPhoto(groupID string, photo []byte) error
+    AddUserToGroup(groupID, userID string) error
+    LeaveGroup(groupID, userID string) error
 
-	//reaction related
-	AddReactionToMessage(reaction *schema.Reaction) error
-	DeleteReactionFromMessage(messageId, userId string) error
+    // reaction related
+    AddReactionToMessage(reaction *schema.Reaction) error
+    DeleteReactionFromMessage(messageId, userId string) error
 }
 
 type appdbimpl struct {

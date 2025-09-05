@@ -223,19 +223,19 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
 		return
 	}
 
-	forwardedMessage := schema.Message{
-		ID:             newMessageID,
-		SenderID:       userID,
-		Sender:         originalMessage.Sender,
-		ConversationID: targetConv,
-		MessageType:    originalMessage.MessageType,
-		Content:        originalMessage.Content,
-		Timestamp:      time.Now().Format(time.RFC3339),
-		MessageStatus:  "sent",
-		Reaction:       []schema.Reaction{},
-		Attachments:    originalMessage.Attachments,
-		ForwardedFrom:  originalMessage.SenderID,
-	}
+    forwardedMessage := schema.Message{
+        ID:             newMessageID,
+        SenderID:       userID,
+        Sender:         originalMessage.Sender,
+        ConversationID: targetConv,
+        MessageType:    originalMessage.MessageType,
+        Content:        originalMessage.Content,
+        Timestamp:      time.Now().Format(time.RFC3339),
+        MessageStatus:  "sent",
+        Reaction:       []schema.Reaction{},
+        Attachments:    originalMessage.Attachments,
+        ForwardedFrom:  originalMessage.ID,
+    }
 
 	if err := rt.db.SendMessage(&forwardedMessage); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to send forwarded message")

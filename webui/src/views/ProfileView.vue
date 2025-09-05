@@ -108,7 +108,8 @@ export default {
                 this.errormsg = null;
             } catch (error) {
                 console.error('Error updating username:', error);
-                this.errormsg = error.response?.data?.message || 'Failed to update username.';
+                const data = error?.response?.data;
+                this.errormsg = (typeof data === 'object' ? (data?.error || data?.message) : data) || 'Failed to update username.';
             }
         },
         refresh() {
