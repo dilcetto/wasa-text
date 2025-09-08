@@ -92,7 +92,7 @@ export default {
     // members fetched separately
     currentPhoto() {
       const b64 = this.group?.profilePhoto || '';
-      return b64 ? 'data:image/png;base64,' + b64 : '';
+      return b64 ? 'data:image/png;base64,' + b64 : '/nopfp.jpg';
     },
     canRename() {
       const v = this.newName?.trim();

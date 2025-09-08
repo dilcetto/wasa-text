@@ -1,11 +1,11 @@
 package database
 
 import (
-    "encoding/base64"
-    "fmt"
-    "strings"
+	"encoding/base64"
+	"fmt"
+	"strings"
 
-    "github.com/dilcetto/wasa/service/components/schema"
+	"github.com/dilcetto/wasa/service/components/schema"
 )
 
 func (db *appdbimpl) SendMessage(message *schema.Message) error {
@@ -13,14 +13,14 @@ func (db *appdbimpl) SendMessage(message *schema.Message) error {
 		return fmt.Errorf("message cannot be nil")
 	}
 
-    var attachment []byte
-    if len(message.Attachments) > 0 {
-        if dec, derr := base64.StdEncoding.DecodeString(message.Attachments[0]); derr == nil {
-            attachment = dec
-        } else {
-            attachment = []byte(message.Attachments[0])
-        }
-    }
+	var attachment []byte
+	if len(message.Attachments) > 0 {
+		if dec, derr := base64.StdEncoding.DecodeString(message.Attachments[0]); derr == nil {
+			attachment = dec
+		} else {
+			attachment = []byte(message.Attachments[0])
+		}
+	}
 	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err := db.c.Exec(query, message.ID, message.ConversationID, message.SenderID, string(message.Content.Value), message.Timestamp, attachment, message.MessageStatus, message.ForwardedFrom)
 	if err != nil {
@@ -65,16 +65,16 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 			return nil, fmt.Errorf("failed to scan message: %w", err)
 		}
 		// Content
-        // always keep text content
-        msg.Content.Value = []byte(content)
-        if len(attachment) > 0 {
-            msg.Content.ContentType = schema.Image
-            msg.MessageType = string(schema.Image)
-            msg.Attachments = []string{base64.StdEncoding.EncodeToString(attachment)}
-        } else {
-            msg.Content.ContentType = schema.TextContent
-            msg.MessageType = string(schema.TextContent)
-        }
+		// always keep text content
+		msg.Content.Value = []byte(content)
+		if len(attachment) > 0 {
+			msg.Content.ContentType = schema.Image
+			msg.MessageType = string(schema.Image)
+			msg.Attachments = []string{base64.StdEncoding.EncodeToString(attachment)}
+		} else {
+			msg.Content.ContentType = schema.TextContent
+			msg.MessageType = string(schema.TextContent)
+		}
 		// Sender
 		msg.Sender.ID = msg.SenderID
 		msg.Sender.Username = senderName
@@ -86,53 +86,68 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 		return nil, fmt.Errorf("error reading messages: %w", err)
 	}
 
-    // load reactions in batch
-    if len(messages) > 0 {
-        idx := make(map[string]*schema.Message, len(messages))
-        placeholders := make([]string, 0, len(messages))
-        args := make([]interface{}, 0, len(messages))
-        for _, m := range messages {
-            idx[m.ID] = m
-            placeholders = append(placeholders, "?")
-            args = append(args, m.ID)
-        }
-        q := "SELECT r.messageId, r.userId, r.reaction, u.username FROM reactions r JOIN users u ON u.id = r.userId WHERE r.messageId IN (" + strings.Join(placeholders, ",") + ")"
-        rr, err := db.c.Query(q, args...)
-        if err == nil {
-            defer rr.Close()
-            for rr.Next() {
-                var mid, uid, emoji, uname string
-                if err := rr.Scan(&mid, &uid, &emoji, &uname); err == nil {
-                    if m := idx[mid]; m != nil {
-                        m.Reaction = append(m.Reaction, schema.Reaction{MessageId: mid, UserId: uid, Emoji: emoji, Username: uname})
-                    }
-                }
-            }
-            if err := rr.Err(); err != nil {
-                // ignore reaction load errors to not fail the whole call
-            }
-        }
-        // aggregate message receipts into a simple status
-        qs := "SELECT message_id, MAX(CASE status WHEN 'read' THEN 2 WHEN 'delivered' THEN 1 ELSE 0 END) AS s FROM message_receipts WHERE message_id IN (" + strings.Join(placeholders, ",") + ") GROUP BY message_id"
-        rs, err := db.c.Query(qs, args...)
-        if err == nil {
-            defer rs.Close()
-            for rs.Next() {
-                var mid string
-                var s int
-                if err := rs.Scan(&mid, &s); err == nil {
-                    if m := idx[mid]; m != nil {
-                        if s >= 2 {
-                            m.MessageStatus = "read"
-                        } else if s == 1 {
-                            m.MessageStatus = "delivered"
-                        }
-                    }
-                }
-            }
-            _ = rs.Err()
-        }
-    }
+	// load reactions in batch
+	if len(messages) > 0 {
+		idx := make(map[string]*schema.Message, len(messages))
+		placeholders := make([]string, 0, len(messages))
+		args := make([]interface{}, 0, len(messages))
+		for _, m := range messages {
+			idx[m.ID] = m
+			placeholders = append(placeholders, "?")
+			args = append(args, m.ID)
+		}
+		q := "SELECT r.messageId, r.userId, r.reaction, u.username FROM reactions r JOIN users u ON u.id = r.userId WHERE r.messageId IN (" + strings.Join(placeholders, ",") + ")"
+		rr, err := db.c.Query(q, args...)
+		if err == nil {
+			defer rr.Close()
+			for rr.Next() {
+				var mid, uid, emoji, uname string
+				if err := rr.Scan(&mid, &uid, &emoji, &uname); err == nil {
+					if m := idx[mid]; m != nil {
+						m.Reaction = append(m.Reaction, schema.Reaction{MessageId: mid, UserId: uid, Emoji: emoji, Username: uname})
+					}
+				}
+			}
+			if err := rr.Err(); err != nil {
+				// ignore reaction load errors to not fail the whole call
+			}
+		}
+		// compute aggregate delivery/read based on all recipients in the conversation
+		// recipients are all members except the sender
+		recipients := 0
+		if row := db.c.QueryRow(`SELECT COUNT(*) FROM conversation_members WHERE conversationId = ?`, conversationID); row != nil {
+			_ = row.Scan(&recipients)
+			if recipients > 0 {
+				recipients -= 1
+			}
+		}
+		if recipients < 0 {
+			recipients = 0
+		}
+
+		qs := "SELECT message_id, " +
+			"SUM(CASE WHEN status = 'read' THEN 1 ELSE 0 END) AS rc, " +
+			"SUM(CASE WHEN status IN ('read','delivered') THEN 1 ELSE 0 END) AS dc " +
+			"FROM message_receipts WHERE message_id IN (" + strings.Join(placeholders, ",") + ") GROUP BY message_id"
+		rs, err := db.c.Query(qs, args...)
+		if err == nil {
+			defer rs.Close()
+			for rs.Next() {
+				var mid string
+				var rc, dc int
+				if err := rs.Scan(&mid, &rc, &dc); err == nil {
+					if m := idx[mid]; m != nil && recipients > 0 {
+						if rc >= recipients {
+							m.MessageStatus = "read"
+						} else if dc >= recipients {
+							m.MessageStatus = "delivered"
+						}
+					}
+				}
+			}
+			_ = rs.Err()
+		}
+	}
 
 	return messages, nil
 }
@@ -150,14 +165,14 @@ func (db *appdbimpl) GetMessageByID(messageID string) (*schema.Message, error) {
 		return nil, err
 	}
 
-    if len(attachment) > 0 {
-        message.Attachments = []string{base64.StdEncoding.EncodeToString(attachment)}
-        message.Content.ContentType = schema.Image
-        message.MessageType = string(schema.Image)
-    } else {
-        message.Content.ContentType = schema.TextContent
-        message.MessageType = string(schema.TextContent)
-    }
+	if len(attachment) > 0 {
+		message.Attachments = []string{base64.StdEncoding.EncodeToString(attachment)}
+		message.Content.ContentType = schema.Image
+		message.MessageType = string(schema.Image)
+	} else {
+		message.Content.ContentType = schema.TextContent
+		message.MessageType = string(schema.TextContent)
+	}
 
 	message.Sender = schema.Sender{
 		ID:       message.SenderID,
@@ -204,14 +219,14 @@ func (db *appdbimpl) ForwardMessage(message *schema.Message, userID string) erro
 
 	}
 
-    var attachment []byte
-    if len(message.Attachments) > 0 {
-        if dec, derr := base64.StdEncoding.DecodeString(message.Attachments[0]); derr == nil {
-            attachment = dec
-        } else {
-            attachment = []byte(message.Attachments[0])
-        }
-    }
+	var attachment []byte
+	if len(message.Attachments) > 0 {
+		if dec, derr := base64.StdEncoding.DecodeString(message.Attachments[0]); derr == nil {
+			attachment = dec
+		} else {
+			attachment = []byte(message.Attachments[0])
+		}
+	}
 	query := `INSERT INTO messages (id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err := db.c.Exec(query, message.ID, message.ConversationID, userID, string(message.Content.Value), message.Timestamp, attachment, message.MessageStatus, message.ForwardedFrom)
 	if err != nil {

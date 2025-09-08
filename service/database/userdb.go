@@ -52,40 +52,40 @@ func (db *appdbimpl) GetUserById(userID string) (*schema.User, error) {
 }
 
 func (db *appdbimpl) SearchUserByUsername(username string) ([]schema.User, error) {
-    var users []schema.User
-    rows, err := db.c.Query("SELECT id, username, photo FROM users WHERE username LIKE ?", "%"+username+"%")
-    if err != nil {
-        return nil, fmt.Errorf("failed to search users by username: %w", err)
-    }
-    defer rows.Close()
+	var users []schema.User
+	rows, err := db.c.Query("SELECT id, username, photo FROM users WHERE username LIKE ?", "%"+username+"%")
+	if err != nil {
+		return nil, fmt.Errorf("failed to search users by username: %w", err)
+	}
+	defer rows.Close()
 
-    for rows.Next() {
-        var u schema.User
-        if err := rows.Scan(&u.ID, &u.Username, &u.Photo); err != nil {
-            return nil, fmt.Errorf("failed to scan user: %w", err)
-        }
-        users = append(users, u)
-    }
-    if err := rows.Err(); err != nil {
-        return nil, fmt.Errorf("error iterating over users: %w", err)
-    }
-    return users, nil
+	for rows.Next() {
+		var u schema.User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Photo); err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
+		}
+		users = append(users, u)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over users: %w", err)
+	}
+	return users, nil
 }
 
 func (db *appdbimpl) UpdateUsername(userId, newName string) error {
-    // check for username collision before updating
-    var exists bool
-    if err := db.c.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE username = ? AND id <> ?)`, newName, userId).Scan(&exists); err != nil {
-        return err
-    }
-    if exists {
-        return ErrUsernameTaken
-    }
+	// check for username collision before updating
+	var exists bool
+	if err := db.c.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE username = ? AND id <> ?)`, newName, userId).Scan(&exists); err != nil {
+		return err
+	}
+	if exists {
+		return ErrUsernameTaken
+	}
 
-    res, err := db.c.Exec(`UPDATE users SET username=? WHERE id=?`, newName, userId)
-    if err != nil {
-        return err
-    }
+	res, err := db.c.Exec(`UPDATE users SET username=? WHERE id=?`, newName, userId)
+	if err != nil {
+		return err
+	}
 	affected, err := res.RowsAffected()
 	if err != nil {
 		return err

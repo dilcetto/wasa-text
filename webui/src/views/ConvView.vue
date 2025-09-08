@@ -54,6 +54,7 @@
             </div>
 
             <div class="actions">
+              <button type="button" class="link" @click.stop.prevent="openReply(m)">Reply</button>
               <button type="button" class="link" @click.stop.prevent="openForward(m.id)">Forward</button>
               <button v-if="isOwn(m)" type="button" class="link danger" @click.stop.prevent="del(m.id)">Delete</button>
               <span class="sep">|</span>
@@ -91,6 +92,11 @@
       </div>
 
       <footer class="composer">
+        <div v-if="reply.active" class="reply-banner">
+          <span class="label">Replying to {{ reply.username || 'message' }}:</span>
+          <span class="snippet">{{ reply.preview }}</span>
+          <button class="link" @click="cancelReply">✕</button>
+        </div>
         <input
           v-model="newMessage"
           class="input"
@@ -134,6 +140,7 @@ export default {
             newMessage: '',
             photoAttachB64: '',
             toast: { show: false, msg: "" },
+            reply: { active: false, preview: '', username: '' },
             conversation: {
                 id: null,
                 displayName: '',
@@ -152,9 +159,9 @@ export default {
         conversationId() {
             return this.$route.params.conversationId;
         },
-        conversationPhoto() {
+    conversationPhoto() {
             const b64 = this.conversation?.profilePhoto || this.conversation?.photo;
-            return b64 ? 'data:image/png;base64,' + b64 : '';
+            return b64 ? 'data:image/png;base64,' + b64 : '/nopfp.jpg';
         },
         canSend() {
             // Allow sending if we have text or an image attachment
@@ -193,10 +200,14 @@ methods: {
     async load() {
         this.errorMessage = null;
         try {
-            const response = await this.$axios.get(`/conversations/${this.conversationId}`);
+            const token = localStorage.getItem('token');
+            const response = await this.$axios.get(`/conversations/${this.conversationId}`, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
             // backend return message.content as base64
             this.conversation = response.data || {};
-            this.$nextTick(this.scrollToBottom);
+            this.$nextTick(() => {
+              this.scrollToBottom();
+              this.markRead();
+            });
         } catch (error) {
             console.error('Error loading conversation:', error);
             this.errorMessage = 'Failed to load conversation';
@@ -206,7 +217,8 @@ methods: {
     },
     async loadConversationsList() {
         try {
-            const res = await this.$axios.get('/conversations');
+            const token = localStorage.getItem('token');
+            const res = await this.$axios.get('/conversations', token ? { headers: { Authorization: `Bearer ${token}` } } : {});
             this.allConversations = res.data || [];
       } catch (e) {
         console.error('Failed to load conversations list', e);
@@ -216,16 +228,35 @@ methods: {
       this.toast = { show: true, msg };
       setTimeout(() => { this.toast.show = false; }, 2000);
     },
+    async markRead() {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const msgs = (this.conversation?.messages || []).filter(m => m && m.id && m.senderId !== this.userId);
+        for (const m of msgs) {
+          try {
+            await this.$axios.post(`/conversations/${this.conversationId}/messages/${m.id}/status`, { status: 'read' }, { headers });
+          } catch (e) {
+            // non-blocking; continue
+          }
+        }
+      } catch {}
+    },
     async send() {
         if (!this.canSend || this.sending) return;
         this.sending = true;
         this.errorMessage = null;
         try {
             let messagePayload = {};
+            let textToSend = this.newMessage || '';
+            if (this.reply.active) {
+              const quoted = `> ${this.reply.username ? '@' + this.reply.username + ': ' : ''}${this.reply.preview}`;
+              textToSend = quoted + (textToSend ? `\n\n${textToSend}` : '');
+            }
             messagePayload = {
               content: {
                 type: 'text',
-                value: this.newMessage ? this.toBase64(this.newMessage) : ''
+                value: textToSend ? this.toBase64(textToSend) : ''
               },
               ...(this.photoAttachB64 ? { attachments: [ this.photoAttachB64 ] } : {})
             };
@@ -233,6 +264,7 @@ methods: {
             await this.$axios.post(`/conversations/${this.conversationId}/messages`, messagePayload, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
             this.newMessage = '';
             this.photoAttachB64 = '';
+            this.reply = { active: false, preview: '', username: '' };
             this.showToast("Message sent.");
             await this.load();
         } catch (error) {
@@ -353,6 +385,16 @@ methods: {
     openForward(messageId) {
         this.forward = { open: true, messageId, target: '' };
         if (!this.allConversations?.length) this.loadConversationsList();
+    },
+    openReply(message) {
+        const text = this.decodeText(message?.content?.value) || '';
+        const preview = text ? (text.length > 80 ? (text.slice(0, 77) + '...') : text) : (message?.attachments?.length ? 'Photo' : '');
+        const username = message?.sender?.username || '';
+        this.reply = { active: true, preview, username };
+        this.$nextTick(() => this.$refs.messageInput?.focus());
+    },
+    cancelReply() {
+        this.reply = { active: false, preview: '', username: '' };
     },
     closeForward() {
         this.forward = { open: false, messageId: null, target: '' };
@@ -491,6 +533,9 @@ methods: {
   border-top: 1px solid var(--border);
   background: var(--bg-alt);
 }
+.reply-banner { display: flex; align-items: center; gap: .5rem; margin-right: auto; color: var(--text-dim); }
+.reply-banner .label { font-weight: 600; }
+.reply-banner .snippet { max-width: 32ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .input {
   flex: 1;
   padding: .6rem .7rem;

@@ -28,7 +28,7 @@
         class="chat-preview"
         @click="viewConversation(chat.conversationId)"
       >
-        <img :src="'data:image/png;base64,' + (chat.profilePhoto || '')" alt="Chat Photo" class="chat-photo" />
+        <img :src="chat.profilePhoto ? ('data:image/png;base64,' + chat.profilePhoto) : '/nopfp.jpg'" alt="Chat Photo" class="chat-photo" />
         <div class="chat-details">
           <h3>{{ chat.displayName }}</h3>
           <p v-if="chat.lastMessage" class="last-message">
@@ -91,8 +91,12 @@ export default {
       return lastSpaceIndex === -1 ? text.substring(0, length) + clamp : text.substring(0, lastSpaceIndex) + clamp;
     },
     getFormattedPreview(lastMessage) {
-      const text = lastMessage?.preview || '';
-      return this.truncateText(text);
+      const type = (lastMessage?.messageType || '').toLowerCase();
+      let text = lastMessage?.preview || '';
+      if (!text || !text.trim()) {
+        if (type === 'image') text = 'Photo';
+      }
+      return this.truncateText(text || '');
     },
     newGroup() {
       this.$router.push({ path: '/new-group' });

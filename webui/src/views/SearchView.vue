@@ -17,7 +17,7 @@
         <h3>Users</h3>
         <div v-if="users.length === 0" class="muted">No users</div>
         <div v-for="u in users" :key="u.id" class="row">
-          <div class="avatar" v-if="u.photo"><img :src="'data:image/png;base64,' + u.photo" alt="" /></div>
+          <div class="avatar"><img :src="u.photo ? ('data:image/png;base64,' + u.photo) : '/nopfp.jpg'" alt="" /></div>
           <div class="label">@{{ u.username }}</div>
           <button class="btn" @click="startChat(u.id)">Start Chat</button>
         </div>
@@ -26,7 +26,7 @@
         <h3>Conversations</h3>
         <div v-if="conversations.length === 0" class="muted">No conversations</div>
         <div v-for="c in conversations" :key="c.conversationId" class="row link" @click="openConv(c.conversationId)">
-          <div class="avatar" v-if="c.profilePhoto"><img :src="'data:image/png;base64,' + c.profilePhoto" alt="" /></div>
+          <div class="avatar"><img :src="c.profilePhoto ? ('data:image/png;base64,' + c.profilePhoto) : '/nopfp.jpg'" alt="" /></div>
           <div class="label">{{ c.displayName }}</div>
         </div>
       </div>

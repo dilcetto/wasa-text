@@ -80,6 +80,7 @@ paths:
           schema:
             type: string
             description: Search query for users.
+            pattern: ^.*?$
             minLength: 1
             maxLength: 100
         - name: conversation
@@ -88,6 +89,7 @@ paths:
           schema:
             type: string
             description: Search query for conversations.
+            pattern: ^.*?$
             minLength: 1
             maxLength: 100
       responses:
@@ -179,6 +181,9 @@ paths:
                     type: string
                     format: byte
                     description: Base64-encoded string of the updated profile photo.
+                    pattern: ^.*?$
+                    minLength: 0
+                    maxLength: 10485760
         '400':
           description: Failed to update profile photo due to invalid input.
           content:
@@ -315,6 +320,7 @@ paths:
           application/json:
             schema:
               type: object
+              description: Object containing the target conversation id.
               required:
                 - targetConversationId
               properties:
@@ -390,12 +396,18 @@ paths:
           required: true
           schema:
             type: string
+            pattern: ^.*?$
+            minLength: 1
+            maxLength: 36
           description: The ID of the conversation containing the message.
         - name: messageId
           in: path
           required: true
           schema:
             type: string
+            pattern: ^.*?$
+            minLength: 1
+            maxLength: 36
           description: The ID of the message whose status is being updated.
       requestBody:
         required: true
@@ -403,22 +415,22 @@ paths:
           application/json:
             schema:
               type: object
+              description: Message status for the authenticated user.
               required:
-                - userId
                 - status
               properties:
-                userId:
-                  type: string
-                  description: The ID of the user marking the message.
                 status:
                   type: string
                   enum: [delivered, read]
-                  description: The status to update (must be either `delivered` or `read`).
+                  description: The status to update for the authenticated user (must be either `delivered` or `read`).
+                  pattern: ^.*?$
+                  minLength: 4
+                  maxLength: 9
       responses:
         '204':
           description: Status updated successfully (no content)
         '400':
-          description: Invalid input (e.g., missing userId or invalid status)
+          description: Invalid input (e.g., invalid status)
           content:
             application/json:
               schema:
@@ -508,6 +520,7 @@ paths:
           application/json:
             schema:
               type: object
+              description: Object containing the target peer user id.
               required: [peerUserId]
               properties:
                 peerUserId:
@@ -545,6 +558,7 @@ paths:
           application/json:
             schema:
               type: object
+              description: Object describing the group to create.
               required: [groupName, members]
               properties:
                 groupName:
@@ -558,12 +572,19 @@ paths:
                   description: Array of user IDs to include
                   items:
                     type: string
+                    description: Unique identifier for a user.
+                    pattern: ^.*?$
+                    minLength: 1
+                    maxLength: 36
                   minItems: 1
                   maxItems: 100
                 groupPhoto:
                   type: string
                   format: byte
                   description: Optional base64-encoded image data
+                  pattern: ^.*?$
+                  minLength: 0
+                  maxLength: 10485760
       responses:
           '201':
             description: Group conversation created successfully
@@ -603,6 +624,7 @@ paths:
           application/json:
             schema:
               type: object
+              description: Object containing the username to add.
               required: [username]
               properties:
                 username:
@@ -670,6 +692,7 @@ paths:
           application/json:
             schema:
               type: object
+              description: Object containing the new group name.
               required: [newName]
               properties:
                 newName:
@@ -716,12 +739,16 @@ paths:
           application/json:
             schema:
               type: object
+              description: Object containing the new group photo.
               required: [groupPhoto]
               properties:
                 groupPhoto:
                   type: string
                   format: byte
                   description: Base64-encoded image data
+                  pattern: ^.*?$
+                  minLength: 0
+                  maxLength: 10485760
       responses:
         '200':
           description: Group photo updated successfully
@@ -744,6 +771,9 @@ paths:
                     type: string
                     format: byte
                     description: Base64-encoded image data
+                    pattern: ^.*?$
+                    minLength: 0
+                    maxLength: 10485760
                   
         '400':
           description: Failed to update group photo
@@ -783,6 +813,9 @@ components:
           type: string
           format: byte
           description: Base64-encoded image data
+          pattern: ^.*?$
+          minLength: 0
+          maxLength: 10485760
     Username:
       type: string
       pattern: ^[a-zA-Z0-9_]+$
@@ -809,16 +842,23 @@ components:
         displayName:
           type: string
           description: Display name of the conversation (e.g., group name or other user's name).
+          pattern: ^.*?$
           minLength: 1
           maxLength: 100
         type:
           type: string
           enum: [direct, group]
           description: Indicates whether the conversation is a private chat or a group conversation.
+          pattern: ^.*?$
+          minLength: 5
+          maxLength: 6
         createdAt:
           type: string
           format: date-time
           description: Timestamp of when the conversation was created.
+          pattern: ^.*?$
+          minLength: 20
+          maxLength: 30
         members:
           type: array
           description: List of usernames in the conversation.
@@ -830,6 +870,9 @@ components:
           type: string
           format: byte
           description: Base64-encoded image data
+          pattern: ^.*?$
+          minLength: 0
+          maxLength: 10485760
         lastMessage:
           $ref: '#/components/schemas/Message'
         messages:
@@ -883,6 +926,9 @@ components:
               type: string
               enum: ['text', 'photo']
               description: Type of message (text or photo).
+              pattern: ^.*?$
+              minLength: 4
+              maxLength: 5
             value:
               type: string
               description: Message text or photo URL.
@@ -893,6 +939,9 @@ components:
           type: string
           format: date-time
           description: Timestamp of when the message was sent.
+          pattern: ^.*?$
+          minLength: 20
+          maxLength: 30
         message_status:
           type: string
           enum: ['sent', 'delivered', 'read']
@@ -913,6 +962,10 @@ components:
           items:
             type: string
             format: byte
+            description: Base64-encoded attachment content
+            pattern: ^.*?$
+            minLength: 0
+            maxLength: 10485760
           minItems: 0
           maxItems: 10
         forwarded_from:

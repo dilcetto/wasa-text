@@ -69,17 +69,26 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, 
 		var last schema.LastMessage
 		var senderID string
 		var ts string
+		var attLen int
 		err = db.c.QueryRow(`
-            SELECT content, timestamp, senderId
-            FROM messages
-            WHERE conversationId = ?
-            ORDER BY timestamp DESC LIMIT 1
-        `, conv.ConversationID).Scan(&last.Preview, &ts, &senderID)
+			SELECT content, timestamp, senderId,
+			       CASE WHEN attachment IS NOT NULL AND LENGTH(attachment) > 0 THEN 1 ELSE 0 END as attlen
+			FROM messages
+			WHERE conversationId = ?
+			ORDER BY timestamp DESC LIMIT 1
+		`, conv.ConversationID).Scan(&last.Preview, &ts, &senderID, &attLen)
 		if err == nil {
 			if t, perr := time.Parse(time.RFC3339, ts); perr == nil {
 				last.Timestamp = t
 			}
-			last.MessageType = "text"
+			if attLen > 0 {
+				last.MessageType = "image"
+				if last.Preview == "" {
+					last.Preview = "Photo"
+				}
+			} else {
+				last.MessageType = "text"
+			}
 			conv.LastMessage = &last
 		}
 
@@ -146,14 +155,27 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 	// Fetch last message
 	var last schema.LastMessage
 	var senderID string
+	var ts2 string
+	var attLen2 int
 	err = db.c.QueryRow(`
-		SELECT content, timestamp, senderId
+		SELECT content, timestamp, senderId,
+		       CASE WHEN attachment IS NOT NULL AND LENGTH(attachment) > 0 THEN 1 ELSE 0 END as attlen
 		FROM messages
 		WHERE conversationId = ?
 		ORDER BY timestamp DESC LIMIT 1
-	`, conv.ConversationID).Scan(&last.Preview, &last.Timestamp, &senderID)
+	`, conv.ConversationID).Scan(&last.Preview, &ts2, &senderID, &attLen2)
 	if err == nil {
-		last.MessageType = "text" // adjust for later message types
+		if t, perr := time.Parse(time.RFC3339, ts2); perr == nil {
+			last.Timestamp = t
+		}
+		if attLen2 > 0 {
+			last.MessageType = "image"
+			if last.Preview == "" {
+				last.Preview = "Photo"
+			}
+		} else {
+			last.MessageType = "text"
+		}
 		conv.LastMessage = &last
 	}
 

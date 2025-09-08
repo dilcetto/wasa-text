@@ -20,14 +20,12 @@
             <div class="profile-head">
                 <div class="profile-photo">
                     <img 
-                        v-if="user.photo" 
-                        :src="user.photo"
+                        :src="user.photo || '/nopfp.jpg'"
                         alt="Profile Photo" 
                         class="rounded-circle"
                         width="100"
                         height="100"
                     />
-                    <div v-else class="no-photo">No Photo Available</div>
                 </div>
                 <div class="username-container">
                     <h2 class="username">{{ username }}</h2>
@@ -68,7 +66,7 @@ export default {
 
             //user state
             user: {
-                photo: localStorage.getItem('userPhoto') || '',
+                photo: localStorage.getItem('userPhoto') || '/nopfp.jpg',
             },
             username: localStorage.getItem('username') || '',
             newUsername: '',
@@ -84,7 +82,7 @@ export default {
     methods: {
         initFromLocal() {
           const name = localStorage.getItem('username') || '';
-          const photo = localStorage.getItem('userPhoto') || '';
+          const photo = localStorage.getItem('userPhoto') || '/nopfp.jpg';
           this.username = name;
           this.user.photo = photo;
         },
