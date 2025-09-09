@@ -24,7 +24,8 @@ type ContentType string
 
 const (
 	TextContent ContentType = "text"
-	Image       ContentType = "image"
+	// Keep constant name for backward compatibility, but align value to OpenAPI ('photo')
+	Image ContentType = "photo"
 )
 
 type MessageContent struct {

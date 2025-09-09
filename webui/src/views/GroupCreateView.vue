@@ -83,6 +83,8 @@ export default {
       const file = e?.target?.files?.[0];
       if (!file) { this.groupPhoto = ""; return; }
       if (!file.type.startsWith('image/')) { this.errormsg = 'Please select an image file'; return; }
+      const max = 10 * 1024 * 1024;
+      if (file.size > max) { this.errormsg = 'Image too large (max 10MB)'; if (e?.target) e.target.value=''; return; }
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result || '';

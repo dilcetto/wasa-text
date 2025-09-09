@@ -82,7 +82,7 @@ func (db *appdbimpl) GetMyConversations(userID string) ([]*schema.Conversation, 
 				last.Timestamp = t
 			}
 			if attLen > 0 {
-				last.MessageType = "image"
+				last.MessageType = "photo"
 				if last.Preview == "" {
 					last.Preview = "Photo"
 				}
@@ -169,7 +169,7 @@ func (db *appdbimpl) GetConversationByID(userID, conversationID string) (*schema
 			last.Timestamp = t
 		}
 		if attLen2 > 0 {
-			last.MessageType = "image"
+			last.MessageType = "photo"
 			if last.Preview == "" {
 				last.Preview = "Photo"
 			}

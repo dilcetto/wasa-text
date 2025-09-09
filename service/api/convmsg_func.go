@@ -45,7 +45,7 @@ func (rt *_router) getConversation(w http.ResponseWriter, r *http.Request, ps ht
 		return
 	}
 
-    conversation, err := rt.db.GetConversationByID(userID, conversationID)
+	conversation, err := rt.db.GetConversationByID(userID, conversationID)
 	if err != nil {
 		ctx.Logger.WithError(err).Error("Failed to get conversation")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
@@ -59,14 +59,14 @@ func (rt *_router) getConversation(w http.ResponseWriter, r *http.Request, ps ht
 		return
 	}
 
-    conversation.Messages = messages
-    for _, msg := range messages {
-        if err := rt.db.MarkMessageStatus(msg.ID, userID, "delivered"); err != nil {
-            ctx.Logger.WithError(err).WithField("message_id", msg.ID).Error("Failed to mark message as delivered")
-            http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-            return
-        }
-    }
+	conversation.Messages = messages
+	for _, msg := range messages {
+		if err := rt.db.MarkMessageStatus(msg.ID, userID, "delivered"); err != nil {
+			ctx.Logger.WithError(err).WithField("message_id", msg.ID).Error("Failed to mark message as delivered")
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(conversation); err != nil {
@@ -237,13 +237,22 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
 		ForwardedFrom:  originalMessage.ID,
 	}
 
-	if err := rt.db.SendMessage(&forwardedMessage); err != nil {
+	// Persist forwarded message
+	if err := rt.db.ForwardMessage(&forwardedMessage, userID); err != nil {
 		ctx.Logger.WithError(err).Error("Failed to send forwarded message")
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	// Return 201 + created message body for better client UX / OpenAPI alignment
+	stored, gerr := rt.db.GetMessageByID(newMessageID)
+	if gerr != nil {
+		w.WriteHeader(http.StatusCreated)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(stored)
 }
 
 func (rt *_router) deleteMessage(w http.ResponseWriter, r *http.Request, ps httprouter.Params, ctx reqcontext.RequestContext) {

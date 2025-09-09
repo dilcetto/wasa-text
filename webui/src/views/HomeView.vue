@@ -14,29 +14,31 @@
       </div>
     </div>
     <div class="chat-list">
-      <ErrorMsg v-if="errormsg" :msg="errormsg" />
-      <div v-if="!errormsg && conversations.length === 0" class="empty">
-        <p>No conversations yet.</p>
-        <div class="cta">
-          <RouterLink to="/search" class="btn">Start a Chat</RouterLink>
-          <RouterLink to="/new-group" class="btn btn-primary">Create a Group</RouterLink>
+      <LoadingSpinner :loading="loading">
+        <ErrorMsg v-if="errormsg" :msg="errormsg" />
+        <div v-if="!errormsg && filteredChats.length === 0" class="empty">
+          <p>{{ isGroupsPage ? 'No groups yet.' : 'No conversations yet.' }}</p>
+          <div class="cta">
+            <RouterLink v-if="!isGroupsPage" to="/search" class="btn">Start a Chat</RouterLink>
+            <RouterLink to="/new-group" class="btn btn-primary">Create a Group</RouterLink>
+          </div>
         </div>
-      </div>
-      <div
-        v-for="chat in filteredChats"
-        :key="chat.conversationId"
-        class="chat-preview"
-        @click="viewConversation(chat.conversationId)"
-      >
-        <img :src="chat.profilePhoto ? ('data:image/png;base64,' + chat.profilePhoto) : '/nopfp.jpg'" alt="Chat Photo" class="chat-photo" />
-        <div class="chat-details">
-          <h3>{{ chat.displayName }}</h3>
-          <p v-if="chat.lastMessage" class="last-message">
-            <span>{{ getFormattedPreview(chat.lastMessage) }}</span>
-            <span> • {{ new Date(chat.lastMessage.timestamp).toLocaleString() }}</span>
-          </p>
+        <div
+          v-for="chat in filteredChats"
+          :key="chat.conversationId"
+          class="chat-preview"
+          @click="viewConversation(chat.conversationId)"
+        >
+          <img :src="chat.profilePhoto ? ('data:image/png;base64,' + chat.profilePhoto) : 'nopfp.jpg'" :alt="(chat.displayName || 'Chat') + ' photo'" class="chat-photo" />
+          <div class="chat-details">
+            <h3>{{ chat.displayName }}</h3>
+            <p v-if="chat.lastMessage" class="last-message">
+              <span>{{ getFormattedPreview(chat.lastMessage) }}</span>
+              <span> • {{ new Date(chat.lastMessage.timestamp).toLocaleString() }}</span>
+            </p>
+          </div>
         </div>
-      </div>
+      </LoadingSpinner>
     </div>
   </div>
 </template>
@@ -55,16 +57,18 @@ export default {
       searchQuery: '',
       user: {
         name: localStorage.getItem('username') || 'Unknown',
-        photo: localStorage.getItem('userPhoto') || '/nopfp.jpg',
+        photo: localStorage.getItem('userPhoto') || 'nopfp.jpg',
       },
       conversations: [],
       errormsg: null,
       pollIntervalId: null,
+      loading: true,
     };
   },
   methods: {
     async loadConversations() {
       this.errormsg = null;
+      this.loading = true;
       try {
         const token = localStorage.getItem("token");
         if (!token) {
@@ -80,7 +84,7 @@ export default {
       } catch (error) {
         console.error("Error loading conversations:", error);
         this.errormsg = "Failed to load conversations.";
-      }
+      } finally { this.loading = false; }
     },
     viewConversation(conversationId) {
       this.$router.push(`/conversations/${conversationId}`);
@@ -94,7 +98,7 @@ export default {
       const type = (lastMessage?.messageType || '').toLowerCase();
       let text = lastMessage?.preview || '';
       if (!text || !text.trim()) {
-        if (type === 'image') text = 'Photo';
+        if (type === 'image' || type === 'photo') text = 'Photo';
       }
       return this.truncateText(text || '');
     },
@@ -111,9 +115,15 @@ export default {
     clearInterval(this.pollIntervalId);
   },
   computed: {
+    isGroupsPage() {
+      return this.$route.path === '/groups';
+    },
     filteredChats() {
       const query = this.searchQuery.toLowerCase();
-      return this.conversations.filter(
+      const base = this.isGroupsPage
+        ? (this.conversations || []).filter(c => (c?.type || '').toLowerCase() === 'group')
+        : (this.conversations || []);
+      return base.filter(
         (chat) =>
           chat.displayName?.toLowerCase().includes(query) ||
           (chat.lastMessage && (chat.lastMessage.preview || '').toLowerCase().includes(query))

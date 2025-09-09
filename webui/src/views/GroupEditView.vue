@@ -92,7 +92,7 @@ export default {
     // members fetched separately
     currentPhoto() {
       const b64 = this.group?.profilePhoto || '';
-      return b64 ? 'data:image/png;base64,' + b64 : '/nopfp.jpg';
+      return b64 ? 'data:image/png;base64,' + b64 : 'nopfp.jpg';
     },
     canRename() {
       const v = this.newName?.trim();
@@ -145,6 +145,8 @@ export default {
         this.errormsg = 'Please select an image file.';
         return;
       }
+      const max = 10 * 1024 * 1024;
+      if (file.size > max) { this.errormsg = 'Image too large (max 10MB)'; if (e?.target) e.target.value=''; return; }
       const reader = new FileReader();
       reader.onload = () => {
         const result = reader.result || '';

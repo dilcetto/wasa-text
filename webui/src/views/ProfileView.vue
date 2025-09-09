@@ -20,7 +20,7 @@
             <div class="profile-head">
                 <div class="profile-photo">
                     <img 
-                        :src="user.photo || '/nopfp.jpg'"
+                        :src="user.photo || 'nopfp.jpg'"
                         alt="Profile Photo" 
                         class="rounded-circle"
                         width="100"
@@ -66,7 +66,7 @@ export default {
 
             //user state
             user: {
-                photo: localStorage.getItem('userPhoto') || '/nopfp.jpg',
+                photo: localStorage.getItem('userPhoto') || 'nopfp.jpg',
             },
             username: localStorage.getItem('username') || '',
             newUsername: '',
@@ -82,7 +82,7 @@ export default {
     methods: {
         initFromLocal() {
           const name = localStorage.getItem('username') || '';
-          const photo = localStorage.getItem('userPhoto') || '/nopfp.jpg';
+          const photo = localStorage.getItem('userPhoto') || 'nopfp.jpg';
           this.username = name;
           this.user.photo = photo;
         },
@@ -121,6 +121,8 @@ export default {
                 this.errormsg = 'Please upload a valid image file.';
                 return;
             }
+            const max = 10 * 1024 * 1024;
+            if (file.size > max) { this.errormsg = 'Image too large (max 10MB)'; if (e?.target) e.target.value=''; return; }
             const reader = new FileReader();
             reader.onload = () => {
                 this.newPhoto = reader.result;

@@ -5,8 +5,8 @@
     </header>
 
     <div class="search-form">
-      <input v-model="qUser" class="input" type="text" placeholder="Search user (username)" />
-      <input v-model="qConv" class="input" type="text" placeholder="Search conversation (name)" />
+      <input v-model="qUser" class="input" type="text" placeholder="Search user (username)" @keyup.enter="doSearch" />
+      <input v-model="qConv" class="input" type="text" placeholder="Search conversation (name)" @keyup.enter="doSearch" />
       <button class="btn" :disabled="!canSearch || loading" @click="doSearch">{{ loading ? 'Searching…' : 'Search' }}</button>
     </div>
 
@@ -17,7 +17,7 @@
         <h3>Users</h3>
         <div v-if="users.length === 0" class="muted">No users</div>
         <div v-for="u in users" :key="u.id" class="row">
-          <div class="avatar"><img :src="u.photo ? ('data:image/png;base64,' + u.photo) : '/nopfp.jpg'" alt="" /></div>
+          <div class="avatar"><img :src="u.photo ? ('data:image/png;base64,' + u.photo) : 'nopfp.jpg'" :alt="'@' + u.username + ' photo'" /></div>
           <div class="label">@{{ u.username }}</div>
           <button class="btn" @click="startChat(u.id)">Start Chat</button>
         </div>
@@ -26,7 +26,7 @@
         <h3>Conversations</h3>
         <div v-if="conversations.length === 0" class="muted">No conversations</div>
         <div v-for="c in conversations" :key="c.conversationId" class="row link" @click="openConv(c.conversationId)">
-          <div class="avatar"><img :src="c.profilePhoto ? ('data:image/png;base64,' + c.profilePhoto) : '/nopfp.jpg'" alt="" /></div>
+          <div class="avatar"><img :src="c.profilePhoto ? ('data:image/png;base64,' + c.profilePhoto) : 'nopfp.jpg'" :alt="(c.displayName || 'Conversation') + ' photo'" /></div>
           <div class="label">{{ c.displayName }}</div>
         </div>
       </div>

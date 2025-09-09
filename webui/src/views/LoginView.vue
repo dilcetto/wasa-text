@@ -7,6 +7,7 @@
           type="text"
           class="form-control"
           placeholder="Enter your username"
+          @keyup.enter="doLogin"
         />
       </div>
       <ErrorMsg v-if="error" :msg="error" />

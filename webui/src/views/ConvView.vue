@@ -3,7 +3,7 @@
 <header class="conv-header">
       <router-link to="/home" class="back">← Back</router-link>
   <div class="peer">
-    <img v-if="conversationPhoto" :src="conversationPhoto" class="avatar" alt="Chat" />
+    <img v-if="conversationPhoto" :src="conversationPhoto" class="avatar" :alt="(conversation.displayName || 'Chat') + ' photo'" />
     <div class="meta">
       <h2 class="name">{{ conversation.displayName || 'Conversation' }}</h2>
       <div class="muted" v-if="conversation.membersIds?.length">
@@ -32,13 +32,13 @@
 
             <div v-if="decodeText(m.content?.value)" class="text" v-text="decodeText(m.content?.value)"></div>
             <div v-if="m.attachments?.length" class="attachment">
-              <img :src="'data:image/png;base64,' + m.attachments[0]" alt="attachment" />
+              <img :src="'data:image/png;base64,' + m.attachments[0]" alt="Image attachment" />
             </div>
 
             <div class="meta-line">
               <span class="sender">{{ m.sender?.username || 'Unknown' }}</span>
               <span class="time">{{ formatTime(m.timestamp) }}</span>
-              <span class="status" v-if="m.message_status">• {{ m.message_status }}</span>
+              <span class="status" v-if="isOwn(m) && m.message_status" :class="statusClass(m.message_status)" :title="m.message_status">{{ statusIcon(m.message_status) }}</span>
             </div>
 
             <div class="reactions" v-if="m.reaction && m.reaction.length">
@@ -105,7 +105,7 @@
           @keyup.enter="send"
           ref="messageInput"
         />
-        <input type="file" accept="image/*" @change="attachPhoto" />
+        <input ref="fileInput" type="file" accept="image/*" @click="resetFileInput" @change="attachPhoto" aria-label="Attach image" />
         <button class="btn" :disabled="!canSend || sending" @click="send">{{ sending ? 'Sending…' : 'Send' }}</button>
       </footer>
 
@@ -119,7 +119,7 @@
             </option>
           </select>
           <div class="forward-actions">
-            <button class="btn" :disabled="!forward.target || forward.target === conversationId || forwarding" @click="doForward">{{ forwarding ? 'Forwarding…' : 'Forward' }}</button>
+            <button class="btn" :disabled="!forward.target || forwarding" @click="doForward">{{ forwarding ? 'Forwarding…' : 'Forward' }}</button>
             <button class="btn secondary" @click="closeForward">Cancel</button>
           </div>
         </div>
@@ -161,7 +161,7 @@ export default {
         },
     conversationPhoto() {
             const b64 = this.conversation?.profilePhoto || this.conversation?.photo;
-            return b64 ? 'data:image/png;base64,' + b64 : '/nopfp.jpg';
+            return b64 ? 'data:image/png;base64,' + b64 : 'nopfp.jpg';
         },
         canSend() {
             // Allow sending if we have text or an image attachment
@@ -169,6 +169,9 @@ export default {
         },
     },
 methods: {
+    onKeyDown(e) {
+      if (e?.key === 'Escape' && this.forward.open) this.closeForward();
+    },
     myReaction(message) {
       try {
         const uid = this.userId;
@@ -264,6 +267,7 @@ methods: {
             await this.$axios.post(`/conversations/${this.conversationId}/messages`, messagePayload, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
             this.newMessage = '';
             this.photoAttachB64 = '';
+            if (this.$refs.fileInput) this.$refs.fileInput.value = '';
             this.reply = { active: false, preview: '', username: '' };
             this.showToast("Message sent.");
             await this.load();
@@ -281,13 +285,32 @@ methods: {
       const file = e?.target?.files?.[0];
       if (!file) { this.photoAttachB64 = ''; return; }
       if (!file.type.startsWith('image/')) { this.errorMessage = 'Please select an image'; return; }
+      // 10MB limit to match backend
+      const max = 10 * 1024 * 1024;
+      if (file.size > max) { this.errorMessage = 'Image too large (max 10MB)'; if (e?.target) e.target.value=''; return; }
       const reader = new FileReader();
+      const inputEl = e?.target || null;
       reader.onload = () => {
         const result = reader.result || '';
         this.photoAttachB64 = typeof result === 'string' && result.includes(',') ? result.split(',')[1] : result;
+        // clear file input so selecting the same file triggers change again
+        if (inputEl) inputEl.value = '';
       };
       reader.onerror = () => { this.errorMessage = 'Failed to read file'; };
       reader.readAsDataURL(file);
+    },
+    statusIcon(status) {
+      const s = String(status || '').toLowerCase();
+      if (s === 'read') return '✓✓';
+      if (s === 'delivered') return '✓✓';
+      return '✓'; // sent
+    },
+    statusClass(status) {
+      const s = String(status || '').toLowerCase();
+      return s === 'read' ? 'read' : (s === 'delivered' ? 'delivered' : 'sent');
+    },
+    resetFileInput(e) {
+      if (e?.target) e.target.value = '';
     },
     async react(messageId, emoji) {
       if (this.reactBusy[messageId]) return;
@@ -387,8 +410,13 @@ methods: {
         if (!this.allConversations?.length) this.loadConversationsList();
     },
     openReply(message) {
-        const text = this.decodeText(message?.content?.value) || '';
-        const preview = text ? (text.length > 80 ? (text.slice(0, 77) + '...') : text) : (message?.attachments?.length ? 'Photo' : '');
+        const text = (this.decodeText(message?.content?.value) || '').trim();
+        const hasImage = Array.isArray(message?.attachments) && message.attachments.length > 0;
+        const parts = [];
+        if (text) parts.push(text);
+        if (hasImage) parts.push('Photo');
+        let preview = parts.join(' • ');
+        if (preview.length > 80) preview = preview.slice(0, 77) + '...';
         const username = message?.sender?.username || '';
         this.reply = { active: true, preview, username };
         this.$nextTick(() => this.$refs.messageInput?.focus());
@@ -411,6 +439,10 @@ methods: {
             );
             this.showToast("Message forwarded.");
             this.closeForward();
+            // If forwarded to the current conversation, refresh messages
+            if (this.forward.target === this.conversationId) {
+              await this.load();
+            }
         } catch (e) {
             console.error('Failed to forward message', e);
             this.errorMessage = 'Failed to forward message';
@@ -451,6 +483,7 @@ methods: {
   },
   mounted() {
     this.load();
+    try { window.addEventListener('keydown', this.onKeyDown); } catch {}
     this.pollId = setInterval(() => this.load(), 10000);
     this.$nextTick(() => {
       this.$refs.messageInput?.focus();
@@ -458,6 +491,7 @@ methods: {
   },
   unmounted() {
     if (this.pollId) clearInterval(this.pollId);
+    try { window.removeEventListener('keydown', this.onKeyDown); } catch {}
   },
 };
 </script>
@@ -513,6 +547,10 @@ methods: {
 .text { white-space: pre-wrap; word-break: break-word; }
 .image img, .attachment img { max-width: 420px; border-radius: 8px; display: block; }
 .meta-line { margin-top: .35rem; font-size: .75rem; color: var(--text-dim); display: flex; gap: .35rem; }
+.status { margin-left: .25rem; }
+.status.sent { color: var(--text-dim); }
+.status.delivered { color: var(--text-dim); }
+.status.read { color: var(--accent-alt); text-shadow: 0 0 6px var(--accent-alt); }
 .actions { margin-top: .35rem; display: flex; gap: .5rem; }
 .link { background: transparent; border: none; color: var(--accent); cursor: pointer; padding: 0; }
 .link.danger { color: #ef4444; }

@@ -153,14 +153,19 @@ func (db *appdbimpl) GetMessagesByConversationID(conversationID string) ([]*sche
 }
 
 func (db *appdbimpl) GetMessageByID(messageID string) (*schema.Message, error) {
-	query := `SELECT id, conversationId, senderId, content, timestamp, attachment, status, forwardedFrom 
-                  FROM messages WHERE id = ?`
+	query := `SELECT m.id, m.conversationId, m.senderId, m.content, m.timestamp, m.attachment, m.status, m.forwardedFrom,
+					 u.username, u.photo
+			FROM messages m
+			JOIN users u ON u.id = m.senderId
+			WHERE m.id = ?`
 
 	row := db.c.QueryRow(query, messageID)
 
 	var message schema.Message
 	var attachment []byte
-	err := row.Scan(&message.ID, &message.ConversationID, &message.SenderID, &message.Content.Value, &message.Timestamp, &attachment, &message.MessageStatus, &message.ForwardedFrom)
+	var senderName string
+	var senderPhoto []byte
+	err := row.Scan(&message.ID, &message.ConversationID, &message.SenderID, &message.Content.Value, &message.Timestamp, &attachment, &message.MessageStatus, &message.ForwardedFrom, &senderName, &senderPhoto)
 	if err != nil {
 		return nil, err
 	}
@@ -176,8 +181,8 @@ func (db *appdbimpl) GetMessageByID(messageID string) (*schema.Message, error) {
 
 	message.Sender = schema.Sender{
 		ID:       message.SenderID,
-		Username: message.Sender.Username,
-		Photo:    message.Sender.Photo,
+		Username: senderName,
+		Photo:    senderPhoto,
 	}
 
 	// load reactions for this message
