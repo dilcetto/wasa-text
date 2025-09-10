@@ -15,7 +15,7 @@
     <div class="results">
       <div class="col">
         <h3>Users</h3>
-        <div v-if="users.length === 0" class="muted">No users</div>
+        <div v-if="hasSearched && users.length === 0" class="muted">No users</div>
         <div v-for="u in users" :key="u.id" class="row">
           <div class="avatar"><img :src="u.photo ? ('data:image/png;base64,' + u.photo) : 'nopfp.jpg'" :alt="'@' + u.username + ' photo'" /></div>
           <div class="label">@{{ u.username }}</div>
@@ -24,10 +24,10 @@
       </div>
       <div class="col">
         <h3>Conversations</h3>
-        <div v-if="conversations.length === 0" class="muted">No conversations</div>
+        <div v-if="hasSearched && conversations.length === 0" class="muted">No conversations</div>
         <div v-for="c in conversations" :key="c.conversationId" class="row link" @click="openConv(c.conversationId)">
           <div class="avatar"><img :src="c.profilePhoto ? ('data:image/png;base64,' + c.profilePhoto) : 'nopfp.jpg'" :alt="(c.displayName || 'Conversation') + ' photo'" /></div>
-          <div class="label">{{ c.displayName }}</div>
+          <div class="label">{{ c.displayName || 'Conversation' }}</div>
         </div>
       </div>
     </div>
@@ -45,6 +45,8 @@ export default {
       conversations: [],
       error: null,
       loading: false,
+      currentUserId: localStorage.getItem('userId') || '',
+      hasSearched: false,
     };
   },
   computed: {
@@ -56,6 +58,7 @@ export default {
     async doSearch() {
       if (!this.canSearch) return;
       this.loading = true;
+      this.hasSearched = true;
       this.error = null;
       this.users = [];
       this.conversations = [];
@@ -64,7 +67,9 @@ export default {
         if (this.qUser.trim()) params.set('user', this.qUser.trim());
         if (this.qConv.trim()) params.set('conversation', this.qConv.trim());
         const res = await this.$axios.get(`/searchby?${params.toString()}`);
-        this.users = res.data?.users || [];
+        const allUsers = res.data?.users || [];
+        // Hide current user from results to avoid self-chats
+        this.users = allUsers.filter(u => u.id !== this.currentUserId);
         this.conversations = res.data?.conversations || [];
       } catch (e) {
         console.error('Search failed', e);

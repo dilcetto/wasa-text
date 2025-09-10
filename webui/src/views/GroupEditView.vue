@@ -10,9 +10,8 @@
       <div class="field">
         <label>Members</label>
         <ul class="members">
-          <li v-for="m in members" :key="m.id">
+          <li v-for="m in visibleMembers" :key="m.id">
             <span class="pill">@{{ m.username }}</span>
-            <span v-if="m.id === currentUserId" class="you">(you)</span>
           </li>
         </ul>
       </div>
@@ -89,6 +88,9 @@ export default {
     currentUserId() {
       return localStorage.getItem('userId') || '';
     },
+    visibleMembers() {
+      try { return (this.members || []).filter(m => m.id !== this.currentUserId); } catch { return []; }
+    },
     // members fetched separately
     currentPhoto() {
       const b64 = this.group?.profilePhoto || '';
@@ -99,8 +101,9 @@ export default {
       return !!v && v.length >= 3 && v.length <= 50;
     },
     canAdd() {
-      const v = this.memberUsername?.trim();
-      return !!v && v.length >= 3 && v.length <= 16;
+      const v = (this.memberUsername || '').trim();
+      const myName = localStorage.getItem('username') || '';
+      return !!v && v.length >= 3 && v.length <= 16 && v.toLowerCase() !== myName.toLowerCase();
     },
   },
   methods: {

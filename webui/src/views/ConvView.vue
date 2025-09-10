@@ -18,7 +18,9 @@
 
     <LoadingSpinner :loading="loading">
       <ErrorMsg v-if="errorMessage" :msg="errorMessage" />
-      <div v-if="toast.show" class="toast">{{ toast.msg }}</div>
+      <div v-if="toast.show" class="toast">{{ toast.msg }}
+        <button v-if="toast.targetId" class="link" @click="openToastTarget">Open chat</button>
+      </div>
 
       <div ref="scrollArea" class="messages">
         <div
@@ -122,6 +124,19 @@
             <button class="btn" :disabled="!forward.target || forwarding" @click="doForward">{{ forwarding ? 'Forwarding…' : 'Forward' }}</button>
             <button class="btn secondary" @click="closeForward">Cancel</button>
           </div>
+
+          <div class="divider">or</div>
+          <div class="new-chat">
+            <div class="new-chat-input">
+              <input v-model="forward.newUsername" class="input" placeholder="Username (exact)" @input="onForwardUserInput" />
+              <div v-if="forward.suggestLoading" class="hint muted">Searching…</div>
+              <div v-else-if="forward.newUsername && !forward.suggestions.length" class="hint muted">No matches</div>
+              <div v-if="forward.suggestions && forward.suggestions.length" class="suggestions">
+                <div class="item" v-for="u in forward.suggestions" :key="u.id" @click="selectForwardSuggestion(u)">@{{ u.username }}</div>
+              </div>
+            </div>
+            <button class="btn" :disabled="!canForwardNew || forwarding" @click="doForwardNew">{{ forwarding ? 'Forwarding…' : 'Create & Forward' }}</button>
+          </div>
         </div>
       </div>
     </LoadingSpinner>
@@ -139,7 +154,7 @@ export default {
             errorMessage: null,
             newMessage: '',
             photoAttachB64: '',
-            toast: { show: false, msg: "" },
+            toast: { show: false, msg: "", targetId: '' },
             reply: { active: false, preview: '', username: '' },
             conversation: {
                 id: null,
@@ -149,7 +164,7 @@ export default {
                 messages: []
             },
             allConversations: [],
-            forward: { open: false, messageId: null, target: '' },
+            forward: { open: false, messageId: null, target: '', newUsername: '', suggestions: [], suggestTimer: null, suggestLoading: false, selectedUserId: '' },
             pollId: null,   
             userId: localStorage.getItem('userId') || null,
             reactBusy: {},
@@ -166,6 +181,12 @@ export default {
         canSend() {
             // Allow sending if we have text or an image attachment
             return (this.newMessage && this.newMessage.trim().length > 0) || !!this.photoAttachB64;
+        },
+        canForwardNew() {
+            const v = (this.forward?.newUsername || '').trim();
+            const okLen = v.length >= 3 && v.length <= 16;
+            const okChars = /^[A-Za-z0-9_]+$/.test(v);
+            return okLen && okChars; // matches Username constraints
         },
     },
 methods: {
@@ -228,8 +249,13 @@ methods: {
       }
     },
     showToast(msg) {
-      this.toast = { show: true, msg };
+      this.toast = { show: true, msg, targetId: this.toast?.targetId || '' };
       setTimeout(() => { this.toast.show = false; }, 2000);
+    },
+    openToastTarget() {
+      const id = this.toast?.targetId;
+      if (id) this.$router.push(`/conversations/${id}`);
+      this.toast = { show: false, msg: "", targetId: '' };
     },
     async markRead() {
       try {
@@ -293,8 +319,6 @@ methods: {
       reader.onload = () => {
         const result = reader.result || '';
         this.photoAttachB64 = typeof result === 'string' && result.includes(',') ? result.split(',')[1] : result;
-        // clear file input so selecting the same file triggers change again
-        if (inputEl) inputEl.value = '';
       };
       reader.onerror = () => { this.errorMessage = 'Failed to read file'; };
       reader.readAsDataURL(file);
@@ -412,11 +436,21 @@ methods: {
     openReply(message) {
         const text = (this.decodeText(message?.content?.value) || '').trim();
         const hasImage = Array.isArray(message?.attachments) && message.attachments.length > 0;
-        const parts = [];
-        if (text) parts.push(text);
-        if (hasImage) parts.push('Photo');
-        let preview = parts.join(' • ');
-        if (preview.length > 80) preview = preview.slice(0, 77) + '...';
+
+        // reply preview that always shows both types when present.
+        // ensure 'Photo' label is preserved even when truncating long text.
+        let preview = '';
+        if (hasImage && text) {
+          const suffix = ' • Photo';
+          const max = 80 - suffix.length; // leave room for the suffix
+          const truncated = text.length > max ? (text.slice(0, Math.max(0, max - 3)) + '...') : text;
+          preview = truncated + suffix;
+        } else if (hasImage) {
+          preview = 'Photo';
+        } else {
+          preview = text;
+        }
+
         const username = message?.sender?.username || '';
         this.reply = { active: true, preview, username };
         this.$nextTick(() => this.$refs.messageInput?.focus());
@@ -425,7 +459,7 @@ methods: {
         this.reply = { active: false, preview: '', username: '' };
     },
     closeForward() {
-        this.forward = { open: false, messageId: null, target: '' };
+        this.forward = { open: false, messageId: null, target: '', newUsername: '', suggestions: [], suggestTimer: null, suggestLoading: false, selectedUserId: '' };
     },
     async doForward() {
         if (!this.forward.messageId || !this.forward.target) return;
@@ -437,7 +471,8 @@ methods: {
               { targetConversationId: this.forward.target },
               token ? { headers: { Authorization: `Bearer ${token}` } } : {}
             );
-            this.showToast("Message forwarded.");
+            this.toast = { show: true, msg: "Message forwarded.", targetId: this.forward.target };
+            setTimeout(() => { this.toast.show = false; }, 2000);
             this.closeForward();
             // If forwarded to the current conversation, refresh messages
             if (this.forward.target === this.conversationId) {
@@ -452,6 +487,76 @@ methods: {
           this.$refs.messageInput?.focus();
         });
         }
+    },
+    async doForwardNew() {
+        if (!this.forward.messageId || !this.canForwardNew) return;
+        this.forwarding = true;
+        try {
+            const username = (this.forward.newUsername || '').trim();
+            const token = localStorage.getItem('token');
+            const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+            // Prefer selected suggestion; otherwise search for the user
+            let userId = this.forward.selectedUserId || '';
+            if (!userId) {
+              const sr = await this.$axios.get(`/searchby?user=${encodeURIComponent(username)}`, { headers });
+              const users = (sr?.data?.users || []).filter(u => u && u.id && (u.username || '').toLowerCase() === username.toLowerCase());
+              userId = users?.[0]?.id || '';
+            }
+            if (!userId) {
+                this.errorMessage = 'User not found';
+                return;
+            }
+
+            // ensure or create the direct conversation
+            const cd = await this.$axios.post('/direct-conversations', { peerUserId: userId }, { headers });
+            const targetId = cd?.data?.conversationId;
+            if (!targetId) {
+                this.errorMessage = 'Failed to create conversation';
+                return;
+            }
+
+            // forward the message to the new conversation
+            await this.$axios.post(
+              `/conversations/${this.conversationId}/messages/${this.forward.messageId}/forward`,
+              { targetConversationId: targetId },
+              { headers }
+            );
+            this.toast = { show: true, msg: 'Message forwarded.', targetId };
+            setTimeout(() => { this.toast.show = false; }, 2000);
+            this.closeForward();
+        } catch (e) {
+            console.error('Failed to forward to new user', e);
+            this.errorMessage = 'Failed to forward';
+        } finally {
+            this.forwarding = false;
+            this.$nextTick(() => { this.$refs.messageInput?.focus(); });
+        }
+    },
+    onForwardUserInput() {
+      // reset selected user and debounce search
+      this.forward.selectedUserId = '';
+      const q = (this.forward.newUsername || '').trim();
+      if (this.forward.suggestTimer) clearTimeout(this.forward.suggestTimer);
+      if (q.length < 2) { this.forward.suggestions = []; this.forward.suggestLoading = false; return; }
+      this.forward.suggestLoading = true;
+      this.forward.suggestTimer = setTimeout(async () => {
+        try {
+          const token = localStorage.getItem('token');
+          const headers = token ? { Authorization: `Bearer ${token}` } : {};
+          const res = await this.$axios.get(`/searchby?user=${encodeURIComponent(q)}`, { headers });
+          const all = res?.data?.users || [];
+          // Exclude self and limit results
+          this.forward.suggestions = all.filter(u => u && u.id && u.id !== this.userId).slice(0, 6);
+        } catch { this.forward.suggestions = []; }
+        finally { this.forward.suggestLoading = false; }
+      }, 250);
+    },
+    selectForwardSuggestion(u) {
+      if (!u) return;
+      this.forward.newUsername = u.username || '';
+      this.forward.selectedUserId = u.id || '';
+      this.forward.suggestions = [];
     },
     isOwn(message) {
         return message?.senderId === this.userId;
@@ -598,6 +703,13 @@ methods: {
 .select { width: 100%; padding: .5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-alt); color: var(--text); }
 .forward-actions { display: flex; gap: .5rem; justify-content: flex-end; }
 .btn.secondary { background: var(--bg-alt); color: var(--text); border: 1px solid var(--border); }
+.divider { text-align: center; color: var(--text-dim); margin-top: .25rem; }
+.new-chat { display: flex; gap: .5rem; align-items: flex-start; }
+.new-chat-input { position: relative; flex: 1; }
+.suggestions { position: absolute; top: 100%; left: 0; right: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; margin-top: .25rem; max-height: 200px; overflow: auto; z-index: 10; }
+.suggestions .item { padding: .4rem .6rem; cursor: pointer; }
+.suggestions .item:hover { background: var(--bg-hover); }
+.hint { font-size: .8rem; margin-top: .25rem; }
 
 .toast {
   position: fixed;

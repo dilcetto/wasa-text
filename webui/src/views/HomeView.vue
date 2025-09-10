@@ -96,10 +96,16 @@ export default {
     },
     getFormattedPreview(lastMessage) {
       const type = (lastMessage?.messageType || '').toLowerCase();
-      let text = lastMessage?.preview || '';
-      if (!text || !text.trim()) {
-        if (type === 'image' || type === 'photo') text = 'Photo';
+      const hasImage = type === 'image' || type === 'photo';
+      const text = (lastMessage?.preview || '').trim();
+
+      if (hasImage && text) {
+        const suffix = ' • Photo';
+        // ensure photo suffix fits
+        const limit = Math.max(10, 50 - suffix.length);
+        return this.truncateText(text, limit) + suffix;
       }
+      if (hasImage && !text) return 'Photo';
       return this.truncateText(text || '');
     },
     newGroup() {

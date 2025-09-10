@@ -5,7 +5,7 @@
     </header>
 
     <div class="card">
-      <ErrorMsg v-if="errorMessage" :msg="errorMessage" />
+      <ErrorMsg v-if="errormsg" :msg="errormsg" />
 
       <div class="form-group">
         <label for="groupName">Group Name</label>
@@ -50,7 +50,6 @@
       >
         Create Group
       </button>
-      <ErrorMsg v-if="errormsg" :msg="errormsg" />
       <div v-if="success" class="success-msg">Group created!</div>
     </div>
   </section>
@@ -71,6 +70,7 @@ export default {
       members: [],
       errormsg: null,
       success: false,
+      currentUserId: localStorage.getItem('userId') || '',
     };
   },
   computed: {
@@ -105,12 +105,16 @@ export default {
         const res = await this.$axios.get(`/searchby?user=${encodeURIComponent(this.userSearch)}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        this.searchResults = res.data?.users || [];
+        const all = res.data?.users || [];
+        // exclude the current user and already-added members from search results
+        this.searchResults = all.filter(u => u.id !== this.currentUserId && !this.members.find(m => m.id === u.id));
       } catch (e) {
         this.errormsg = "Failed to search users";
       }
     },
     addMember(user) {
+      // backend includes creator automatically
+      if (user?.id === this.currentUserId) return;
       if (!this.members.find(m => m.id === user.id)) {
         this.members.push(user);
       }
@@ -125,7 +129,8 @@ export default {
         const token = localStorage.getItem('token');
         const payload = {
           groupName: this.groupName,
-          members: this.members.map(m => m.id),
+          // send other members 
+          members: this.members.map(m => m.id).filter(id => id && id !== this.currentUserId),
           groupPhoto: this.groupPhoto || undefined,
         };
         const res = await this.$axios.post('/groups', payload, {
