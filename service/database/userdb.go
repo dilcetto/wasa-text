@@ -30,9 +30,9 @@ func (db *appdbimpl) CreateUser(u *schema.User) error {
 	return nil
 }
 
-func (db *appdbimpl) GetUserByName(name string) (*schema.User, error) {
+func (db *appdbimpl) GetUserByName(username string) (*schema.User, error) {
 	var u schema.User
-	err := db.c.QueryRow("SELECT id, username, photo FROM users WHERE username = ?", name).Scan(&u.ID, &u.Username, &u.Photo)
+	err := db.c.QueryRow("SELECT id, username, photo FROM users WHERE username = ?", username).Scan(&u.ID, &u.Username, &u.Photo)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrUserDoesNotExist

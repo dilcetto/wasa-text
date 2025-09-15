@@ -167,7 +167,7 @@ func (rt *_router) sendMessage(w http.ResponseWriter, r *http.Request, ps httpro
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	// Return 201 + created message body for better client UX / OpenAPI alignment
+	// Return 201
 	stored, gerr := rt.db.GetMessageByID(messageID)
 	if gerr != nil {
 		w.WriteHeader(http.StatusCreated)
@@ -244,7 +244,7 @@ func (rt *_router) forwardMessage(w http.ResponseWriter, r *http.Request, ps htt
 		return
 	}
 
-	// Return 201 + created message body for better client UX / OpenAPI alignment
+	// Return 201 with the new message
 	stored, gerr := rt.db.GetMessageByID(newMessageID)
 	if gerr != nil {
 		w.WriteHeader(http.StatusCreated)

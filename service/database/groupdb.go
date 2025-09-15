@@ -8,9 +8,6 @@ import (
 	"github.com/dilcetto/wasa/service/components/schema"
 )
 
-// unifying "groups" on conversations with type = 'group'.
-// methods operate on conversations/conversation_members instead of separate groups tables.
-
 func (db *appdbimpl) GetGroupByID(groupID string) (*schema.Group, error) {
 	// fetch conversation as a group
 	var g schema.Group

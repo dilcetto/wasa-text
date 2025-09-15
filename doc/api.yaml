@@ -931,7 +931,7 @@ components:
               maxLength: 5
             value:
               type: string
-              description: Message text or photo URL.
+              description: Message text or photo.
               pattern: ^.*?$
               maxLength: 500
               minLength: 1

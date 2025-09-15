@@ -144,19 +144,25 @@ func New(db *sql.DB) (AppDatabase, error) {
 			FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
 		);`
 
-		groupsTable := `CREATE TABLE groups (
-			id TEXT NOT NULL PRIMARY KEY,
-			name TEXT NOT NULL,
-			photo BLOB
-		);`
+		// NOTE:
+		// groups as separate tables (groups, group_members).
+		// at the end, unified groups and direct chats inside the `conversations` table
+		// using `type = 'group' | 'direct'`, with members in conversation_members.
+		// This simplifies the overall logic, as groups are just a type of conversation.
+		//
+		// groupsTable := `CREATE TABLE groups (
+		// 	id TEXT NOT NULL PRIMARY KEY,
+		// 	name TEXT NOT NULL,
+		// 	photo BLOB
+		// );`
 
-		groupMembersTable := `CREATE TABLE group_members (
-			groupId TEXT NOT NULL,
-			userId TEXT NOT NULL,
-			PRIMARY KEY (groupId, userId),
-			FOREIGN KEY (groupId) REFERENCES groups(id) ON DELETE CASCADE,
-			FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-		);`
+		// groupMembersTable := `CREATE TABLE group_members (
+		// 	groupId TEXT NOT NULL,
+		// 	userId TEXT NOT NULL,
+		// 	PRIMARY KEY (groupId, userId),
+		// 	FOREIGN KEY (groupId) REFERENCES groups(id) ON DELETE CASCADE,
+		// 	FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+		// );`
 
 		messageStatusTable := `CREATE TABLE message_status (
 			messageId TEXT NOT NULL,
@@ -184,8 +190,8 @@ func New(db *sql.DB) (AppDatabase, error) {
 			conversationMembersTable,
 			messagesTable,
 			reactionsTable,
-			groupsTable,
-			groupMembersTable,
+			// groupsTable,
+			// groupMembersTable,
 			messageStatusTable,
 			messageReceipts,
 		}

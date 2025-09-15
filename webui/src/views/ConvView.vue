@@ -698,8 +698,8 @@ methods: {
 .btn:disabled { opacity: .6; cursor: not-allowed; }
 
 /* forward dialog */
-.forward-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; }
-.forward-card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; width: min(92vw, 420px); color: var(--text); box-shadow: var(--shadow); display: grid; gap: .6rem; }
+.forward-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 2000; }
+.forward-card { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 1rem; width: min(92vw, 420px); color: var(--text); box-shadow: var(--shadow); display: grid; gap: .6rem; z-index: 2001; }
 .select { width: 100%; padding: .5rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-alt); color: var(--text); }
 .forward-actions { display: flex; gap: .5rem; justify-content: flex-end; }
 .btn.secondary { background: var(--bg-alt); color: var(--text); border: 1px solid var(--border); }

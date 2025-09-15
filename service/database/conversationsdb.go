@@ -204,10 +204,6 @@ func (db *appdbimpl) SearchConversationByName(name string) ([]schema.Conversatio
 	return conversations, nil
 }
 
-// CreateConversation inserts a new conversation into the database.
-// This method is kept explicitly to be reused by other internal logic
-// (e.g., auto-creating private conversations during SendMessage) or
-// for explicit group chat creation if needed in the future.
 func (db *appdbimpl) CreateConversation(conversation *schema.Conversation) error {
 	query := `
 		INSERT INTO conversations (id, name, type, created_at, conversationPhoto)
@@ -299,19 +295,19 @@ func (db *appdbimpl) EnsureDirectConversation(userID, peerUserID string) (*schem
 		return db.GetConversationByID(userID, conversationID)
 	}
 
-	// create a new direct conversation
+	// create a new direct conversation via the single write path
 	convID, cerr := uuid.NewV4()
 	if cerr != nil {
 		return nil, fmt.Errorf("failed generating conversation id: %w", cerr)
 	}
-	// other user's username
-	_, cerr = db.c.Exec(`INSERT INTO conversations (id, name, type, created_at, conversationPhoto) VALUES (?, ?, 'direct', datetime('now'), NULL)`, convID.String(), "direct")
-	if cerr != nil {
-		return nil, fmt.Errorf("failed to create conversation: %w", cerr)
+	conv := &schema.Conversation{
+		ConversationID: convID.String(),
+		DisplayName:    "direct",
+		Type:           "direct",
+		Members:        []string{userID, peerUserID},
 	}
-	// Add members
-	if _, cerr = db.c.Exec(`INSERT INTO conversation_members (conversationId, userId) VALUES (?, ?), (?, ?)`, convID.String(), userID, convID.String(), peerUserID); cerr != nil {
-		return nil, fmt.Errorf("failed to add members to conversation: %w", cerr)
+	if cerr = db.CreateConversation(conv); cerr != nil {
+		return nil, fmt.Errorf("failed to create conversation: %w", cerr)
 	}
 	return db.GetConversationByID(userID, convID.String())
 }
