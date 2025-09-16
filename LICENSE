@@ -1,0 +1,20 @@
+# WASAText
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+Licensed under the MIT License © 2025 Dana Rabandiyar
+
+WASAText is a lightweight messaging platform built for the Web and Software Architecture course. It pairs a Go API backed by SQLite with a Vue 3 single page application and demonstrates authentication, conversation management, and messaging features suitable for the exam project we just completed. Now that the exam is passed we are publishing the code base.
+
+## Features
+
+- Username-based onboarding with self-registration and stateless JWT authentication.
+- SQLite-backed persistence for users, direct and group conversations, and message receipts.
+- Direct chats and group conversations with photo, rename, add/invite, and leave operations.
+- Rich messaging with text or photo attachments, delivery/read receipts, deletion, and forwarding.
+- Emoji reactions aggregated per message.
+- User and conversation search plus profile updates (username and avatar upload).
+- Vue 3 SPA consuming the REST API defined in `doc/api.yaml`.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

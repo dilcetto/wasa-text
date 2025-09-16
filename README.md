@@ -1,115 +1,108 @@
-# Fantastic coffee (decaffeinated)
+# WASAText
 
-This repository contains the basic structure for [Web and Software Architecture](http://gamificationlab.uniroma1.it/en/wasa/) homework project.
-It has been described in class.
+WASAText is a lightweight messaging platform built for the Web and Software Architecture course. It pairs a Go API backed by SQLite with a Vue 3 single page application and demonstrates authentication, conversation management, and messaging features suitable for the exam project we just completed. 
 
-"Fantastic coffee (decaffeinated)" is a simplified version for the WASA course, not suitable for a production environment.
-The full version can be found in the "Fantastic Coffee" repository.
+## Features
+- Username-based onboarding with self-registration and stateless JWT authentication.
+- SQLite-backed persistence for users, direct and group conversations, and message receipts.
+- Direct chats and group conversations with photo, rename, add/invite, and leave operations.
+- Rich messaging with text or photo attachments, delivery/read receipts, deletion, and forwarding.
+- Emoji reactions aggregated per message.
+- User and conversation search plus profile updates (username and avatar upload).
+- Vue 3 SPA consuming the REST API defined in `doc/api.yaml`.
 
-## Project structure
+## Tech Stack
+- Go 1.17 with `httprouter`, `logrus`, and `sqlite3`.
+- SQLite database auto-initialised by `service/database`.
+- Vue 3 + Vite, packaged with Yarn 4 using the offline mirror stored in `.yarn`.
+- Docker-based Node 20 environment via `open-node.sh` for frontend development.
+- Dockerfiles for backend and frontend deployment examples.
 
-* `cmd/` contains all executables; Go programs here should only do "executable-stuff", like reading options from the CLI/env, etc.
-	* `cmd/healthcheck` is an example of a daemon for checking the health of servers daemons; useful when the hypervisor is not providing HTTP readiness/liveness probes (e.g., Docker engine)
-	* `cmd/webapi` contains an example of a web API server daemon
-* `demo/` contains a demo config file
-* `doc/` contains the documentation (usually, for APIs, this means an OpenAPI file)
-* `service/` has all packages for implementing project-specific functionalities
-	* `service/api` contains an example of an API server
-	* `service/globaltime` contains a wrapper package for `time.Time` (useful in unit testing)
-* `vendor/` is managed by Go, and contains a copy of all dependencies
-* `webui/` is an example of a web frontend in Vue.js; it includes:
-	* Bootstrap JavaScript framework
-	* a customized version of "Bootstrap dashboard" template
-	* feather icons as SVG
-	* Go code for release embedding
+## Technologies Used
 
-Other project files include:
-* `open-node.sh` starts a new (temporary) container using `node:20` image for safe and secure web frontend development (you don't want to use `node` in your system, do you?).
+### Backend
+- **Go 1.17** – API server, business logic
+- **SQLite** – Embedded database
+- **httprouter** – Lightweight router
+- **logrus** – Structured logging
+- **uuid** – Unique identifier generation
 
-## Go vendoring
+### Frontend
+- **Vue 3 + Vite** – SPA UI framework and bundler
+- **Vue Router** – Page navigation
+- **Axios** – HTTP client
+- **Bootstrap + custom CSS** – Responsive design
 
-This project uses [Go Vendoring](https://go.dev/ref/mod#vendoring). You must use `go mod vendor` after changing some dependency (`go get` or `go mod tidy`) and add all files under `vendor/` directory in your commit.
+## Repository Layout
+- `cmd/webapi/` – entrypoint that wires configuration, logging, database, and the HTTP server.
+- `service/api/` – HTTP handlers (auth, profile, conversations, messages, reactions, groups).
+- `service/database/` – SQLite persistence layer and schema bootstrap.
+- `service/components/` – shared request/response schemas.
+- `webui/` – Vue SPA, components, router, Axios client, and build tooling.
+- `doc/api.yaml` – full OpenAPI 3 specification of the REST endpoints.
+- `demo/config.yml` – sample configuration values for the API server.
+- `Dockerfile.backend` / `Dockerfile.frontend` – container images for deployment.
 
-For more information about vendoring:
+## Getting Started
 
-* https://go.dev/ref/mod#vendoring
-* https://www.ardanlabs.com/blog/2020/04/modules-06-vendoring.html
+### Prerequisites
+- Go 1.17 or newer.
+- Docker (recommended for `open-node.sh`) or a local Node 20 + Yarn 4.5 installation.
+- SQLite is bundled via CGO, so no extra service needs to be running.
 
-## Node/YARN vendoring
+### Backend
+- Start the API server with `go run ./cmd/webapi`. By default it listens on `http://localhost:3000` and stores data in `/tmp/decaf.db`.
+- Override settings via CLI flags or environment variables as defined in `cmd/webapi/load-configuration.go`. Example: `CFG_DB_FILENAME=./wasa.db go run ./cmd/webapi --cfg.web.apihost=127.0.0.1:3000`.
+- The first run automatically bootstraps the database schema. Logs and graceful shutdown handling are managed for you.
 
-This repository uses `yarn` and a vendoring technique that exploits the ["Offline mirror"](https://yarnpkg.com/features/caching). As for the Go vendoring, the dependencies are inside the repository.
+Try a quick smoke test:
 
-You should commit the files inside the `.yarn` directory.
-
-## How to set up a new project from this template
-
-You need to:
-
-* Change the Go module path to your module path in `go.mod`, `go.sum`, and in `*.go` files around the project
-* Rewrite the API documentation `doc/api.yaml`
-* If no web frontend is expected, remove `webui` and `cmd/webapi/register-webui.go`
-* Update top/package comment inside `cmd/webapi/main.go` to reflect the actual project usage, goal, and general info
-* Update the code in `run()` function (`cmd/webapi/main.go`) to connect to databases or external resources
-* Write API code inside `service/api`, and create any further package inside `service/` (or subdirectories)
-
-## How to build
-
-If you're not using the WebUI, or if you don't want to embed the WebUI into the final executable, then:
-
-```shell
-go build ./cmd/webapi/
+```bash
+curl -X POST http://localhost:3000/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"alice"}'
 ```
 
-If you're using the WebUI and you want to embed it into the final executable:
+The response returns the created user and a bearer token.
 
-```shell
-./open-node.sh
-# (here you're inside the container)
-yarn run build-embed
-exit
-# (outside the container)
+### Frontend
+Run `./open-node.sh` to enter an ephemeral Node 20 container already mounted at `/src/webui`.
+
+Inside the container start the dev server with `yarn run dev` and open `http://localhost:5173`. The command installs dependencies on demand thanks to the Yarn offline mirror.
+
+For a production bundle run `yarn run build-prod`. To embed the SPA inside the Go binary run `yarn run build-embed` before building the backend with:
+
+```bash
 go build -tags webui ./cmd/webapi/
 ```
 
-## How to run (in development mode)
+## Docker Images
+- `Dockerfile.backend` builds the API service (optionally after embedding the web UI).
+- `Dockerfile.frontend` serves the SPA standalone if you prefer to host it separately.
 
-You can launch the backend only using:
+## API Documentation
+The REST contract lives in `doc/api.yaml`. Preview it with any OpenAPI viewer, e.g.:
 
-```shell
-go run ./cmd/webapi/
+```bash
+npx @redocly/openapi-cli preview-docs doc/api.yaml
 ```
 
-If you want to launch the WebUI, open a new tab and launch:
+Or point Swagger UI to the file.
 
-```shell
-./open-node.sh
-# (here you're inside the container)
-yarn run dev
-```
+Endpoints cover login, profile management, conversation discovery, message operations (send, forward, delete, set status), reactions, and group management.
 
-## How to build for production / homework delivery
+## Testing
+Run `go test ./...` to execute the backend unit tests and ensure the project still builds.
 
-```shell
-./open-node.sh
-# (here you're inside the container)
-yarn run build-prod
-```
-
-For "Web and Software Architecture" students: before committing and pushing your work for grading, please read the section below named "My build works when I use `yarn run dev`, however there is a Javascript crash in production/grading"
-
-## Known issues
-
-### My build works when I use `yarn run dev`, however there is a Javascript crash in production/grading
-
-Some errors in the code are somehow not shown in `vite` development mode. To preview the code that will be used in production/grading settings, use the following commands:
-
-```shell
-./open-node.sh
-# (here you're inside the container)
-yarn run build-prod
-yarn run preview
-```
+## Production Notes
+- Replace the development secret in `service/api/token.go` (`jwtKey`) before deploying a public instance.
+- Update `webui/vite.config.js` if the API is exposed on a URL other than `http://localhost:3000`; the `__API_URL__` constant controls the Axios base URL.
+- Consider serving the API behind TLS and configuring reverse proxies/CORS as needed for your hosting environment.
+- Remember to persist the SQLite database file or move to an external database if you expect multiple instances.
 
 ## License
+This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
 
-See [LICENSE](LICENSE).
+## Maintainers
+
+This project was built by Dana Rabandiyar as part of the Web and Software Architecture course at Sapienza University of Rome (2025). For questions or reuse, feel free to fork or reference the codebase.
