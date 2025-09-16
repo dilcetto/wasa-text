@@ -1,20 +1,21 @@
-# WASAText
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+MIT License
 
-Licensed under the MIT License © 2025 Dana Rabandiyar
+Copyright (c) 2025 Dana Rabandiyar
 
-WASAText is a lightweight messaging platform built for the Web and Software Architecture course. It pairs a Go API backed by SQLite with a Vue 3 single page application and demonstrates authentication, conversation management, and messaging features suitable for the exam project we just completed. Now that the exam is passed we are publishing the code base.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-## Features
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-- Username-based onboarding with self-registration and stateless JWT authentication.
-- SQLite-backed persistence for users, direct and group conversations, and message receipts.
-- Direct chats and group conversations with photo, rename, add/invite, and leave operations.
-- Rich messaging with text or photo attachments, delivery/read receipts, deletion, and forwarding.
-- Emoji reactions aggregated per message.
-- User and conversation search plus profile updates (username and avatar upload).
-- Vue 3 SPA consuming the REST API defined in `doc/api.yaml`.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
